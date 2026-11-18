@@ -5,6 +5,9 @@ import {
   parseCustomGridId,
   specFor,
   validateCustomGrid,
+  parseCustomSizeInput,
+  typingHintForCustomSize,
+  commitCustomSizeInput,
 } from "../grid";
 import { generateKolam } from "../generator";
 import { svgPathIsClosed } from "../pathGeom";
@@ -55,5 +58,23 @@ describe("custom grids", () => {
       expect(pattern.loopCount, id).toBeGreaterThanOrEqual(1);
       expect(pattern.paths.every((d) => svgPathIsClosed(d)), id).toBe(true);
     }
+  });
+
+  it("lets a size field be cleared and typed freely, clamping only when committed", () => {
+    expect(parseCustomSizeInput("").status).toBe("empty");
+    expect(typingHintForCustomSize("")).toBeNull();
+    expect(typingHintForCustomSize("7")).toBeNull();
+    expect(typingHintForCustomSize("15")).toBeNull();
+    // Mid-edit values like "1" (on the way to "15") must not be rewritten;
+    // a gentle hint is ok, but commit happens later.
+    expect(parseCustomSizeInput("1").status).toBe("range");
+    expect(typingHintForCustomSize("1")).toMatch(/3 to 15/);
+    expect(parseCustomSizeInput("16").status).toBe("range");
+    expect(commitCustomSizeInput("16", 7)).toEqual({ value: 15, hint: "Using 15 (sizes are 3 to 15)." });
+    expect(commitCustomSizeInput("1", 7)).toEqual({ value: 3, hint: "Using 3 (sizes are 3 to 15)." });
+    expect(commitCustomSizeInput("", 7)).toEqual({ value: 7, hint: null });
+    expect(commitCustomSizeInput("abc", 9)).toEqual({ value: 9, hint: "Use a whole number from 3 to 15." });
+    expect(commitCustomSizeInput("8", 7)).toEqual({ value: 8, hint: null });
+    expect(parseCustomSizeInput("3.5").status).toBe("invalid");
   });
 });

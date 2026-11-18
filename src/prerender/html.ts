@@ -219,11 +219,11 @@ export function buildDayPage(input: DayPageInput): DayPage {
           <label class="custom-opt"><input type="radio" name="custom-shape" value="diamond"> Diamond interlaced</label>
         </div>
         <div id="custom-square-fields" class="custom-fields">
-          <label>Rows <input id="custom-rows" type="number" min="3" max="15" value="7" inputmode="numeric"></label>
-          <label>Cols <input id="custom-cols" type="number" min="3" max="15" value="7" inputmode="numeric"></label>
+          <label>Rows <input id="custom-rows" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" value="7" aria-describedby="custom-error"></label>
+          <label>Cols <input id="custom-cols" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" value="7" aria-describedby="custom-error"></label>
         </div>
         <div id="custom-diamond-fields" class="custom-fields" hidden>
-          <label>Center row <input id="custom-center" type="number" min="3" max="15" value="5" inputmode="numeric"></label>
+          <label>Center row <input id="custom-center" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" value="5" aria-describedby="custom-error"></label>
         </div>
         <p id="custom-error" class="custom-error" hidden></p>
       </div>

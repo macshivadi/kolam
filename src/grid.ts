@@ -251,6 +251,49 @@ export function validateCustomGrid(input: {
   return { ok: false, error: "Choose Square or Diamond interlaced." };
 }
 
+export type CustomSizeParse =
+  | { status: "empty" }
+  | { status: "ok"; value: number }
+  | { status: "range"; value: number; hint: string }
+  | { status: "invalid"; hint: string };
+
+const SIZE_HINT = "Use a whole number from 3 to 15.";
+
+/** Parse a typable size field. Empty is allowed mid-edit; do not rewrite it. */
+export function parseCustomSizeInput(raw: string): CustomSizeParse {
+  const s = raw.trim();
+  if (s === "") return { status: "empty" };
+  if (!/^\d+$/.test(s)) return { status: "invalid", hint: SIZE_HINT };
+  const n = Number(s);
+  if (n >= CUSTOM_MIN && n <= CUSTOM_MAX) return { status: "ok", value: n };
+  return { status: "range", value: n, hint: SIZE_HINT };
+}
+
+export function clampCustomSize(n: number): number {
+  if (!Number.isFinite(n)) return CUSTOM_MIN;
+  return Math.min(CUSTOM_MAX, Math.max(CUSTOM_MIN, Math.round(n)));
+}
+
+/** Hint while typing: silent for empty or valid values so backspace can clear the field. */
+export function typingHintForCustomSize(raw: string): string | null {
+  const parsed = parseCustomSizeInput(raw);
+  if (parsed.status === "empty" || parsed.status === "ok") return null;
+  return parsed.hint;
+}
+
+/** Clamp or restore a field on blur / Generate. */
+export function commitCustomSizeInput(raw: string, fallback: number): { value: number; hint: string | null } {
+  const parsed = parseCustomSizeInput(raw);
+  const fb = clampCustomSize(fallback);
+  if (parsed.status === "ok") return { value: parsed.value, hint: null };
+  if (parsed.status === "range") {
+    const value = clampCustomSize(parsed.value);
+    return { value, hint: `Using ${value} (sizes are 3 to 15).` };
+  }
+  return { value: fb, hint: parsed.status === "empty" ? null : SIZE_HINT };
+}
+
+
 const CUSTOM_SQUARE = /^custom:square:(\d+)x(\d+)$/;
 const CUSTOM_DIAMOND = /^custom:diamond:(\d+)$/;
 

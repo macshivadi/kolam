@@ -506,7 +506,7 @@ html[data-ambience="night"] .lamp-flame {
   align-items: center;
   gap: 6px;
 }
-.custom-fields input[type="number"] {
+.custom-fields input {
   width: 3.6em;
   min-height: 36px;
   padding: 0 6px;

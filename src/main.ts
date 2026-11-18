@@ -1,6 +1,6 @@
 import { addDays, clampToPastOrToday, isValidDateString, kolamNumber, localDateString } from "./dateSeed";
 import { appRootFromPathname, datePath, datePageUrl, parseDatePath, resolveSiteUrl } from "./paths";
-import { GRID_IDS, pulliLabel, specFor, isCustomGridId, validateCustomGrid, parseCustomGridId, type GridId } from "./grid";
+import { GRID_IDS, pulliLabel, specFor, isCustomGridId, validateCustomGrid, parseCustomGridId, typingHintForCustomSize, commitCustomSizeInput, type GridId } from "./grid";
 import { generateKolam, kolamOfTheDay, type KolamPattern } from "./generator";
 import { hashString } from "./prng";
 import { kolamSvg, strokeEndTime, strokeWidthFor } from "./render";
@@ -251,12 +251,65 @@ function setCustomError(message: string | null): void {
   }
 }
 
+function customShape(): string {
+  return (document.querySelector('input[name="custom-shape"]:checked') as HTMLInputElement | null)?.value ?? "square";
+}
+
+function customInput(id: string): HTMLInputElement | null {
+  return document.getElementById(id) as HTMLInputElement | null;
+}
+
+function fallbackCustomSize(pendingGridId: string, which: "rows" | "cols" | "center"): number {
+  const parsed = parseCustomGridId(isCustomGridId(pendingGridId) ? pendingGridId : "");
+  if (which === "center") return parsed?.rows ? Math.max(...parsed.rows) : 5;
+  if (which === "rows") return parsed?.nr ?? parsed?.n ?? 7;
+  return parsed?.nc ?? parsed?.n ?? 7;
+}
+
 function readCustomDraft(): ReturnType<typeof validateCustomGrid> {
-  const shape = (document.querySelector('input[name="custom-shape"]:checked') as HTMLInputElement | null)?.value ?? "square";
-  const rows = Number((document.getElementById("custom-rows") as HTMLInputElement | null)?.value);
-  const cols = Number((document.getElementById("custom-cols") as HTMLInputElement | null)?.value);
-  const center = Number((document.getElementById("custom-center") as HTMLInputElement | null)?.value);
+  const shape = customShape();
+  const rows = Number(customInput("custom-rows")?.value);
+  const cols = Number(customInput("custom-cols")?.value);
+  const center = Number(customInput("custom-center")?.value);
   return validateCustomGrid({ shape, rows, cols, center });
+}
+
+function typingHintForVisibleFields(): string | null {
+  const shape = customShape();
+  const ids = shape === "diamond" ? ["custom-center"] : ["custom-rows", "custom-cols"];
+  for (const id of ids) {
+    const el = customInput(id);
+    if (!el) continue;
+    const hint = typingHintForCustomSize(el.value);
+    if (hint) return hint;
+  }
+  return null;
+}
+
+/** Clamp visible size fields, write them back, and return a generate-ready draft. */
+function commitCustomFields(pendingGridId: string): ReturnType<typeof validateCustomGrid> {
+  const shape = customShape();
+  const hints: string[] = [];
+  if (shape === "diamond") {
+    const el = customInput("custom-center");
+    const committed = commitCustomSizeInput(el?.value ?? "", fallbackCustomSize(pendingGridId, "center"));
+    if (el) el.value = String(committed.value);
+    if (committed.hint) hints.push(committed.hint);
+    const draft = validateCustomGrid({ shape, center: committed.value });
+    setCustomError(hints[0] ?? (draft.ok ? null : draft.error));
+    return draft;
+  }
+  const rows = commitCustomSizeInput(customInput("custom-rows")?.value ?? "", fallbackCustomSize(pendingGridId, "rows"));
+  const cols = commitCustomSizeInput(customInput("custom-cols")?.value ?? "", fallbackCustomSize(pendingGridId, "cols"));
+  const rowsEl = customInput("custom-rows");
+  const colsEl = customInput("custom-cols");
+  if (rowsEl) rowsEl.value = String(rows.value);
+  if (colsEl) colsEl.value = String(cols.value);
+  if (rows.hint) hints.push(rows.hint);
+  if (cols.hint) hints.push(cols.hint);
+  const draft = validateCustomGrid({ shape, rows: rows.value, cols: cols.value });
+  setCustomError(hints[0] ?? (draft.ok ? null : draft.error));
+  return draft;
 }
 
 function showCustomFields(shape: string): void {
@@ -280,15 +333,17 @@ function syncCustomPanel(state: State): void {
     showCustomFields("square");
     const rows = document.getElementById("custom-rows") as HTMLInputElement | null;
     const cols = document.getElementById("custom-cols") as HTMLInputElement | null;
-    if (rows) rows.value = String(parsed.nr ?? parsed.n);
-    if (cols) cols.value = String(parsed.nc ?? parsed.n);
+    const active = document.activeElement;
+    if (rows && rows !== active) rows.value = String(parsed.nr ?? parsed.n);
+    if (cols && cols !== active) cols.value = String(parsed.nc ?? parsed.n);
   } else {
     const shape = document.querySelector('input[name="custom-shape"][value="diamond"]') as HTMLInputElement | null;
     if (shape) shape.checked = true;
     showCustomFields("diamond");
     const center = document.getElementById("custom-center") as HTMLInputElement | null;
     const mid = parsed.rows ? Math.max(...parsed.rows) : 5;
-    if (center) center.value = String(mid);
+    const active = document.activeElement;
+    if (center && center !== active) center.value = String(mid);
   }
 }
 
@@ -676,12 +731,8 @@ function wire(state: State): void {
   $("generate").addEventListener("click", () => {
     let gridId = state.pendingGridId;
     if (isCustomGridId(gridId) || gridId === "custom" || !(document.getElementById("custom-grid")?.hidden ?? true)) {
-      const draft = readCustomDraft();
-      if (!draft.ok) {
-        setCustomError(draft.error);
-        return;
-      }
-      setCustomError(null);
+      const draft = commitCustomFields(state.pendingGridId);
+      if (!draft.ok) return;
       gridId = draft.spec.id;
       state.pendingGridId = gridId;
     }
@@ -777,22 +828,45 @@ function wire(state: State): void {
 
   ($("wa-contact") as HTMLAnchorElement).href = KOLAM_WHATSAPP_URL;
 
-  const onCustomChange = () => {
+  const onCustomShapeChange = () => {
+    showCustomFields(customShape());
     const draft = readCustomDraft();
-    showCustomFields((document.querySelector('input[name="custom-shape"]:checked') as HTMLInputElement | null)?.value ?? "square");
     if (draft.ok) {
       setCustomError(null);
       Object.assign(state, selectPendingGrid(state, draft.spec.id));
     } else {
-      setCustomError(draft.error);
+      setCustomError(typingHintForVisibleFields());
+    }
+    renderChrome(state);
+  };
+  const onCustomType = () => {
+    // Free typing: never rewrite the field. Hint only if the value is out of range.
+    showCustomFields(customShape());
+    setCustomError(typingHintForVisibleFields());
+    const draft = readCustomDraft();
+    if (draft.ok) Object.assign(state, selectPendingGrid(state, draft.spec.id));
+  };
+  const onCustomBlur = (ev: Event) => {
+    const el = ev.target as HTMLInputElement;
+    const which = el.id === "custom-center" ? "center" : el.id === "custom-cols" ? "cols" : "rows";
+    const committed = commitCustomSizeInput(el.value, fallbackCustomSize(state.pendingGridId, which));
+    el.value = String(committed.value);
+    const draft = readCustomDraft();
+    if (draft.ok) {
+      Object.assign(state, selectPendingGrid(state, draft.spec.id));
+      setCustomError(committed.hint);
+    } else {
+      setCustomError(committed.hint ?? typingHintForVisibleFields() ?? (draft.ok ? null : draft.error));
     }
     renderChrome(state);
   };
   document.querySelectorAll('input[name="custom-shape"]').forEach((el) => {
-    el.addEventListener("change", onCustomChange);
+    el.addEventListener("change", onCustomShapeChange);
   });
   for (const id of ["custom-rows", "custom-cols", "custom-center"]) {
-    document.getElementById(id)?.addEventListener("input", onCustomChange);
+    const el = document.getElementById(id);
+    el?.addEventListener("input", onCustomType);
+    el?.addEventListener("blur", onCustomBlur);
   }
 }
 
