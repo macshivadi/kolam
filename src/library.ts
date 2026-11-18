@@ -123,6 +123,53 @@ export const CURATED_PATTERNS: CuratedPattern[] = [
   entry("d34543-lotus", "3-4-5-4-3 lotus", "d34543", "lotus", "navaratri"),
   entry("d34543-sparse-knots", "3-4-5-4-3 corner knots", "d34543", "sparse-knots"),
   entry("d34543-star-diag", "3-4-5-4-3 star", "d34543", "star-diag", ["christmas", "newyear"]),
+
+
+  // Recreations of traditional pulli/sikku forms (our own vector skeletons,
+  // not traced pixels): teardrop edges on small diamonds, 4-fold hearts and
+  // petal crowns, and a four-lamp deepam for Diwali.
+  entry("d5-teardrop-edge", "5-1 teardrop edge", "d5", "teardrop-edge"),
+  entry("d5-heart-petals", "5-1 heart petals", "d5", "heart-petals"),
+  entry("d5-petal-crown", "5-1 petal crown", "d5", "petal-crown"),
+  entry("d5-deepam", "5-1 deepam", "d5", "deepam", "diwali"),
+
+  entry("d7-teardrop-edge", "7-1 teardrop edge", "d7", "teardrop-edge"),
+  entry("d7-heart-petals", "7-1 heart petals", "d7", "heart-petals"),
+  entry("d7-petal-crown", "7-1 petal crown", "d7", "petal-crown", "diwali"),
+  entry("d7-deepam", "7-1 deepam", "d7", "deepam", "diwali"),
+  entry("d7-cardinal-lotus", "7-1 cardinal lotus", "d7", "cardinal-lotus", "navaratri"),
+
+  entry("d9-teardrop-edge", "9-1 teardrop edge", "d9", "teardrop-edge"),
+  entry("d9-heart-petals", "9-1 heart petals", "d9", "heart-petals"),
+  entry("d9-petal-crown", "9-1 petal crown", "d9", "petal-crown", ["diwali", "karthigai"]),
+  entry("d9-deepam", "9-1 deepam", "d9", "deepam", "diwali"),
+
+  entry("d23432-teardrop-edge", "2-3-4-3-2 teardrop edge", "d23432", "teardrop-edge"),
+  entry("d23432-heart-petals", "2-3-4-3-2 heart petals", "d23432", "heart-petals"),
+  entry("d23432-petal-crown", "2-3-4-3-2 petal crown", "d23432", "petal-crown", ["diwali", "karthigai"]),
+  entry("d23432-deepam", "2-3-4-3-2 deepam", "d23432", "deepam", "diwali"),
+  entry("d23432-cardinal-lotus", "2-3-4-3-2 cardinal lotus", "d23432", "cardinal-lotus"),
+
+  entry("d34543-teardrop-edge", "3-4-5-4-3 teardrop edge", "d34543", "teardrop-edge"),
+  entry("d34543-heart-petals", "3-4-5-4-3 heart petals", "d34543", "heart-petals"),
+  entry("d34543-petal-crown", "3-4-5-4-3 petal crown", "d34543", "petal-crown", ["diwali", "karthigai"]),
+  entry("d34543-deepam", "3-4-5-4-3 deepam", "d34543", "deepam", "diwali"),
+  entry("d34543-star-knots", "3-4-5-4-3 star knots", "d34543", "star-knots", ["christmas", "newyear"]),
+
+  entry("d2442-teardrop-edge", "2-4-4-2 teardrop edge", "d2442", "teardrop-edge"),
+  entry("d2442-heart-petals", "2-4-4-2 heart petals", "d2442", "heart-petals"),
+  entry("d2442-deepam", "2-4-4-2 deepam", "d2442", "deepam", "diwali"),
+
+  entry("5x5-heart-petals", "Five-pulli heart petals", "5x5", "heart-petals"),
+  entry("5x5-petal-crown", "Five-pulli petal crown", "5x5", "petal-crown"),
+  entry("5x5-teardrop-edge", "Five-pulli teardrop edge", "5x5", "teardrop-edge"),
+
+  entry("7x7-heart-petals", "Seven-pulli heart petals", "7x7", "heart-petals"),
+  entry("7x7-petal-crown", "Seven-pulli petal crown", "7x7", "petal-crown", ["diwali", "karthigai"]),
+  entry("7x7-quad-windows", "Seven-pulli window panes", "7x7", "quad-windows"),
+  entry("7x7-star-knots", "Seven-pulli star knots", "7x7", "star-knots", ["christmas", "newyear"]),
+  entry("7x7-deepam", "Seven-pulli deepam", "7x7", "deepam", "diwali"),
+  entry("7x7-teardrop-edge", "Seven-pulli teardrop edge", "7x7", "teardrop-edge"),
 ];
 
 export function hasFestival(pattern: CuratedPattern, id: FestivalId): boolean {

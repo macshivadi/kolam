@@ -171,7 +171,14 @@ export type RecipeId =
   | "nested"
   | "sparse-knots"
   | "outer-ring"
-  | "diamond-petals";
+  | "diamond-petals"
+  | "teardrop-edge"
+  | "heart-petals"
+  | "petal-crown"
+  | "cardinal-lotus"
+  | "quad-windows"
+  | "star-knots"
+  | "deepam";
 
 export const RECIPE_IDS: RecipeId[] = [
   "cross-knot",
@@ -291,6 +298,34 @@ export function applyRecipe(spec: GridSpec, recipe: RecipeId, opts: RecipeOpts =
         break;
       case "diamond-petals":
         on = t.kind === "center" || t.kind === "corner" || isOutEdge;
+        break;
+      case "teardrop-edge":
+        // A teardrop loop around every outer pulli — the classic diamond sikku edge.
+        on = t.kind === "center" || t.kind === "corner" || t.kind === "edge";
+        break;
+      case "heart-petals":
+        // Four heart/petal lobes on the cardinals, open toward the rim.
+        on = t.kind === "center" || t.kind === "corner" || (t.kind === "interior" && t.axis && (isMid || isOuter));
+        break;
+      case "petal-crown":
+        // Inner lotus with an outer petal ring.
+        on = t.kind === "center" || t.kind === "corner" || isInner || isOutEdge;
+        break;
+      case "cardinal-lotus":
+        // Diamond body with lotus/leaf at the four tips.
+        on = t.kind === "center" || t.kind === "corner" || (t.kind === "interior" && t.axis) || isOutEdge;
+        break;
+      case "quad-windows":
+        // Four rounded window-panes around a plus.
+        on = t.kind === "center" || isMid || isOutEdge;
+        break;
+      case "star-knots":
+        // Diagonal star with corner teardrop knots.
+        on = t.kind === "center" || t.kind === "corner" || (t.kind === "interior" && t.diag);
+        break;
+      case "deepam":
+        // Four-lamp Diwali skeleton: central bowl, axis stems, tip flames.
+        on = t.kind === "center" || isInner || t.kind === "corner" || (t.kind === "interior" && t.axis && isOuter);
         break;
     }
     if (opts.openFrame && t.kind === "edge") on = false;
