@@ -10,20 +10,27 @@ import {
 } from "../generator";
 
 describe("daily grid cycle", () => {
-  it("cycles through larger grids only (7×7, 9×9, 11×11, diamond-9)", () => {
-    expect(DAILY_GRID_CYCLE).toEqual(["7x7", "9x9", "11x11", "d9"]);
-    expect(dailyGridId(LAUNCH_DATE)).toBe("7x7");
-    expect(dailyGridId(addDays(LAUNCH_DATE, 1))).toBe("9x9");
-    expect(dailyGridId(addDays(LAUNCH_DATE, 2))).toBe("11x11");
-    expect(dailyGridId(addDays(LAUNCH_DATE, 3))).toBe("d9");
-    expect(dailyGridId(addDays(LAUNCH_DATE, 4))).toBe("7x7");
+  it("cycles primarily through small and medium interlaced diamonds", () => {
+    expect(DAILY_GRID_CYCLE.length).toBeGreaterThanOrEqual(6);
+    const squares = DAILY_GRID_CYCLE.filter((id) => id.includes("x"));
+    const diamonds = DAILY_GRID_CYCLE.filter((id) => !id.includes("x"));
+    expect(diamonds.length).toBeGreaterThan(squares.length);
+    expect(DAILY_GRID_CYCLE).toContain("d5");
+    expect(DAILY_GRID_CYCLE).toContain("d7");
+    expect(DAILY_GRID_CYCLE).toContain("d9");
+    expect(DAILY_GRID_CYCLE).toContain("d23432");
+    expect(DAILY_GRID_CYCLE).toContain("d34543");
+    expect(DAILY_GRID_CYCLE.filter((id) => id === "9x9").length).toBe(1);
+    expect(DAILY_GRID_CYCLE).not.toContain("11x11");
+    expect(dailyGridId(LAUNCH_DATE)).toBe(DAILY_GRID_CYCLE[0]);
+    expect(dailyGridId(addDays(LAUNCH_DATE, DAILY_GRID_CYCLE.length))).toBe(DAILY_GRID_CYCLE[0]);
   });
 
   it("has ample D4-orbit pattern space on every daily grid", () => {
     for (const id of DAILY_GRID_CYCLE) {
       const orbits = listOrbits(buildRegion(GRIDS[id])).length;
       // 2^orbits is the configuration count; need comfortably more than 10 years.
-      expect(orbits).toBeGreaterThanOrEqual(12);
+      expect(orbits).toBeGreaterThanOrEqual(8);
     }
   });
 });

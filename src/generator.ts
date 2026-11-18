@@ -16,7 +16,7 @@ import { type MirrorGrid } from "./mirrors";
 import { loopToPath, traceLoops, type Loop } from "./tracer";
 import { canonicalGeometryHash } from "./canonical";
 import { constructSymmetricKolam } from "./construct";
-import { applyCurated, curatedForFestival, curatedForGrid } from "./library";
+import { applyCurated, curatedForFestival, dailyCatalog } from "./library";
 import { festivalOn } from "./festivals";
 
 export type KolamPattern = {
@@ -36,6 +36,33 @@ export type KolamPattern = {
 
 export function attemptSeed(base: number, sub: number): number {
   return hashString(`kolam-attempt:${base >>> 0}:${sub}`) >>> 0;
+}
+
+/**
+ * Generated daily kolams must stay open and readable: not a dense net,
+ * a distinct center motif, and strokes that reach the edge (petals / frame).
+ */
+export function isAesthetic(pattern: KolamPattern): boolean {
+  if (pattern.uncovered.length > 0 || pattern.loopCount < 1) return false;
+  const W = pattern.grid.W;
+  const cap = Math.max(6, Math.min(16, Math.floor(W * 2.2)));
+  if (pattern.loopCount > cap) return false;
+  const c = pattern.grid.c;
+  const maxR = W * 0.5;
+  let hasCenter = false;
+  let hasEdge = false;
+  for (const loop of pattern.loops) {
+    let minR = Infinity;
+    let maxLoopR = 0;
+    for (const m of loop.mids) {
+      const r = Math.hypot(m.x - c, m.y - c);
+      if (r < minR) minR = r;
+      if (r > maxLoopR) maxLoopR = r;
+    }
+    if (minR < maxR * 0.38) hasCenter = true;
+    if (maxLoopR > maxR * 0.7) hasEdge = true;
+  }
+  return hasCenter && hasEdge;
 }
 
 function fromGrid(grid: MirrorGrid, seed: number, subSeed: number): KolamPattern {
@@ -78,12 +105,14 @@ export function generateKolam(
     // Same traditional recipes as the curated library, with seed-unique
     // decorative variation so consecutive Generate taps stay distinct.
     const pattern = fromGrid(constructSymmetricKolam(spec, s), seed, sub);
+    const pretty = isAesthetic(pattern);
     const better =
       !best ||
       pattern.uncovered.length < best.uncovered.length ||
-      (pattern.uncovered.length === best.uncovered.length && pattern.loopCount < best.loopCount);
+      (pattern.uncovered.length === best.uncovered.length && pretty && !isAesthetic(best)) ||
+      (pattern.uncovered.length === best.uncovered.length && pretty === isAesthetic(best) && pattern.loopCount < best.loopCount);
     if (better) best = pattern;
-    if (pattern.uncovered.length === 0 && pattern.loopCount <= cap) return pattern;
+    if (pattern.uncovered.length === 0 && pattern.loopCount <= cap && pretty) return pattern;
   }
   return best!;
 }
@@ -121,15 +150,20 @@ export function placeDailyMirrors(
   const spec = dailyGridSpec(dateStr, launch);
   const s = attemptSeed(seedFromDate(dateStr), subSeed);
   const fest = festivalOn(dateStr);
+  const dayIndex = daysBetween(dateStr, launch);
+  const wrap = (i: number, n: number) => ((i % n) + n) % n;
   // Festival days open with curated classics (may use a fitting traditional grid).
   if (fest && subSeed < 8) {
     const list = curatedForFestival(fest.id);
-    if (list.length) return applyCurated(list[(s + subSeed) % list.length]);
+    const diamonds = list.filter((p) => p.gridId.startsWith("d"));
+    const pick = diamonds.length ? diamonds : list;
+    if (pick.length) return applyCurated(pick[wrap(dayIndex + subSeed, pick.length)]);
   }
-  // Even sub-seeds frequently use a classic on the day's usual grid.
-  if (subSeed % 2 === 0) {
-    const list = curatedForGrid(spec.id);
-    if (list.length) return applyCurated(list[(s >>> 0) % list.length]);
+  // One curated attempt (sub-seed 0) so early days are classics without
+  // spending uniqueness-search time retracing the catalog every later day.
+  if (subSeed === 0) {
+    const catalog = dailyCatalog();
+    if (catalog.length) return applyCurated(catalog[wrap(dayIndex, catalog.length)]);
   }
   return constructSymmetricKolam(spec, s);
 }

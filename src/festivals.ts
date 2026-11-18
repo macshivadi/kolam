@@ -237,3 +237,23 @@ export function festivalOn(dateStr: string): Festival | undefined {
 export function defaultThemeForDate(dateStr: string): ThemeId {
   return festivalOn(dateStr)?.theme ?? "classic";
 }
+
+/**
+ * Greeting shown on the page. Never appends a day label that is already
+ * inside the greeting (e.g. "Happy Deepavali" must not become
+ * "Happy Deepavali · Deepavali").
+ */
+export function festivalChipText(fest: Festival): string {
+  if (!fest.dayLabel || fest.dayLabel === fest.name) return fest.greeting;
+  if (fest.greeting.includes(fest.dayLabel)) return fest.greeting;
+  const greetLc = fest.greeting.toLowerCase();
+  const unused = fest.dayLabel.split(/\s*·\s*/).filter((part) => {
+    const p = part.toLowerCase();
+    if (greetLc.includes(p)) return false;
+    const tail = p.replace(/^(thai|mattu|kaanum)\s+/, "");
+    if (tail !== p && greetLc.includes(tail)) return false;
+    return true;
+  });
+  if (unused.length === 0) return fest.greeting;
+  return `${fest.greeting} · ${unused.join(" · ")}`;
+}

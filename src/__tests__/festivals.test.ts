@@ -1,11 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { defaultThemeForDate, festivalOn } from "../festivals";
+import { defaultThemeForDate, festivalOn, festivalChipText } from "../festivals";
 import { kolamOfTheDay } from "../generator";
 import { pageDescription, pageTitle } from "../paths";
 import { buildDayPage } from "../prerender/html";
 import { THEME_IDS } from "../themes";
 
 describe("festival calendar 2025–2030", () => {
+  it("shows Happy Deepavali once, without repeating the day name", () => {
+    const f = festivalOn("2026-11-08");
+    expect(f).toBeTruthy();
+    expect(festivalChipText(f!)).toBe("Happy Deepavali");
+    expect(festivalChipText(f!)).not.toContain("·");
+  });
+
+  it("keeps the coinciding harvest greeting short", () => {
+    const f = festivalOn("2026-01-14");
+    expect(f).toBeTruthy();
+    const chip = festivalChipText(f!);
+    expect(chip).toContain("Happy Pongal");
+    expect(chip).toContain("Makara Sankranti");
+    expect(chip.split("Pongal").length - 1).toBe(1);
+    expect(chip.split("Makara Sankranti").length - 1).toBe(1);
+  });
+
   it("uses the Timeanddate India Diwali (Deepavali) dates", () => {
     const dates: Record<string, string> = {
       "2025-10-20": "2025",
@@ -114,6 +131,7 @@ describe("festival SEO pages", () => {
     });
     expect(page.title).toBe("Diwali Kolam for Nov 8, 2026 | Kolam");
     expect(page.html).toContain("Happy Deepavali");
+    expect(page.html).not.toContain("Happy Deepavali · Deepavali");
     expect(page.html).toContain("#0c1026"); // diwali floor
     expect(page.jsonLd.description).toEqual(page.description);
     expect(page.description).toContain("Diwali");

@@ -1,10 +1,23 @@
 import type { KolamPattern } from "./generator";
+import { dotSpacing } from "./grid";
 import type { Theme } from "./themes";
 import type { FillRegion } from "./regions";
 import type { KolamStyleId } from "./styles";
 import { motifSvg } from "./motifs";
 
-export const STROKE_WIDTH = 0.08;
+/** Fallback used by tests; prefer strokeWidthFor(spec). */
+export const STROKE_RATIO = 0.2;
+export const STROKE_WIDTH = 0.2;
+
+export function strokeWidthFor(spec: Parameters<typeof dotSpacing>[0]): number {
+  return STROKE_RATIO * dotSpacing(spec);
+}
+
+export function defaultPaddingFor(pattern: KolamPattern, hasMotifs: boolean): number {
+  const sp = dotSpacing(pattern.spec);
+  return hasMotifs ? sp * 1.7 + 1.2 : sp * 1.15;
+}
+
 
 export type SvgOptions = {
   theme: Theme;
@@ -75,8 +88,8 @@ function fillGroup(fills: FillRegion[] | undefined): string {
 }
 
 export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
-  const motifs = opts.style ? motifSvg(opts.style, pattern.grid.W, pattern.paths) : "";
-  const padding = opts.padding ?? (motifs ? 2.4 : 1.15);
+  const motifs = opts.style ? motifSvg(opts.style, pattern.grid.W, pattern.paths, opts.padding ?? defaultPaddingFor(pattern, true)) : "";
+  const padding = opts.padding ?? defaultPaddingFor(pattern, Boolean(motifs));
   const theme = opts.theme;
   const vb = viewBoxFor(pattern, padding);
   const b = bounds(pattern, padding);
@@ -90,7 +103,7 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
       const delay = opts.static
         ? ""
         : ` style="animation-delay:${strokeDelay.toFixed(2)}s;animation-duration:${drawSecs.toFixed(2)}s"`;
-      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="${STROKE_WIDTH}" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay} filter="url(#flour-${fid})"/>`;
+      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="${strokeWidthFor(pattern.spec)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay} filter="url(#flour-${fid})"/>`;
     })
     .join("\n");
   const dots = pattern.grid.dots
@@ -100,10 +113,11 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
           ? ` class="kolam-dot"`
           : ""
         : ` class="kolam-dot" style="animation-delay:${((p.y - 1) * rowDelay).toFixed(2)}s"`;
+      const sp = dotSpacing(pattern.spec);
       if (opts.goldRings) {
-        return `    <g${delay}><circle class="kolam-dot-ring" cx="${p.x}" cy="${p.y}" r="0.13" fill="none" stroke="#e8c547" stroke-width="0.045"/><circle cx="${p.x}" cy="${p.y}" r="0.07" fill="${theme.dot}"/></g>`;
+        return `    <g${delay}><circle class="kolam-dot-ring" cx="${p.x}" cy="${p.y}" r="${(0.13 * sp).toFixed(3)}" fill="none" stroke="#e8c547" stroke-width="${(0.045 * sp).toFixed(3)}"/><circle cx="${p.x}" cy="${p.y}" r="${(0.07 * sp).toFixed(3)}" fill="${theme.dot}"/></g>`;
       }
-      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="0.085" fill="${theme.dot}"/>`;
+      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="${(0.11 * sp).toFixed(3)}" fill="${theme.dot}"/>`;
     })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">
@@ -130,7 +144,7 @@ export function ogShareSvg(
   style?: KolamStyleId,
   fills?: FillRegion[],
 ): string {
-  const padding = style ? 2.4 : 1.15;
+  const padding = defaultPaddingFor(pattern, Boolean(style));
   const vb = viewBoxFor(pattern, padding);
   const inner = kolamSvg(pattern, { theme, static: true, padding, style, fills });
   const size = 560;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shareText, shareTextShort, whatsappShareUrl, xShareUrl } from "../share";
+import { shareText, shareTextShort, whatsappShareUrl, xShareUrl, nativeShareData } from "../share";
 
 const daily = {
   kind: "daily" as const,
@@ -40,10 +40,23 @@ describe("share invites", () => {
     expect(decodeURIComponent(xShareUrl(generated).replace(/\+/g, " "))).toContain(shareTextShort(generated));
   });
 
-  it("packs the full daily invite into the WhatsApp fallback", () => {
+  it("packs the full daily invite into the WhatsApp fallback once", () => {
     const wa = whatsappShareUrl(daily);
     expect(wa.startsWith("https://wa.me/?text=")).toBe(true);
-    expect(decodeURIComponent(wa)).toContain("Kolam #1");
-    expect(decodeURIComponent(wa)).toContain("?date=2026-11-17");
+    const decoded = decodeURIComponent(wa);
+    expect(decoded).toContain("Kolam #1");
+    expect(decoded).toContain(daily.url);
+    expect(decoded.split(daily.url).length - 1).toBe(1);
+  });
+
+  it("passes the url separately and omits it from text for navigator.share", () => {
+    const payload = nativeShareData(daily);
+    expect(payload.url).toBe(daily.url);
+    expect(payload.text).toContain("Kolam #1");
+    expect(payload.text).not.toContain("http");
+    expect(payload.text).not.toContain(daily.url);
+    const gen = nativeShareData(generated);
+    expect(gen.url).toBe(generated.url);
+    expect(gen.text).not.toContain("http");
   });
 });

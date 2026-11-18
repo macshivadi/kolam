@@ -14,7 +14,7 @@ import {
 import { kolamSvg, ogShareSvg } from "../render";
 import { THEMES } from "../themes";
 import { pulliLabel } from "../grid";
-import { festivalOn } from "../festivals";
+import { festivalOn, festivalChipText } from "../festivals";
 import { styleForFestival, styleUsesColor } from "../styles";
 import { colorRegions } from "../regions";
 import { defaultColorMode, rangoliPalette } from "../palettes";
@@ -96,9 +96,9 @@ export function buildDayPage(input: DayPageInput): DayPage {
   const description = pageDescription(date, number, festival);
   const canonical = datePageUrl(siteUrl, date);
   const ogImage = ogImageUrl(siteUrl, date);
-  const style = festival ? styleForFestival(festival.id) : (defaultColorMode(Math.max(number, 0)) ? "color" : "line");
+  const style = festival ? styleForFestival(festival.id) : "line";
   const theme = THEMES[festival?.theme ?? "classic"];
-  const autoColor = defaultColorMode(Math.max(number, 0));
+  const autoColor = defaultColorMode(number, Boolean(festival));
   const fills = styleUsesColor(style, autoColor)
     ? colorRegions(pattern, rangoliPalette(theme.id, festival?.id))
     : undefined;
@@ -118,7 +118,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
   const homeHref = prefix || "./";
   const hero = compactHeroLine(date, number, pulliLabel(pattern.spec));
   const festChip = festival
-    ? `<p id="festival-chip" class="festival-chip">${escapeHtml(festival.greeting)}${festival.dayLabel && festival.dayLabel !== festival.name ? ` · ${escapeHtml(festival.dayLabel)}` : ""}</p>`
+    ? `<p id="festival-chip" class="festival-chip">${escapeHtml(festivalChipText(festival))}</p>`
     : `<p id="festival-chip" class="festival-chip" hidden></p>`;
 
   const html = `<!DOCTYPE html>

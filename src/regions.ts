@@ -1,6 +1,7 @@
 import { sampleSvgPath } from "./pathGeom";
 import { d4Point } from "./canonical";
 import type { KolamPattern } from "./generator";
+import { dotSpacing } from "./grid";
 
 export type FillRegion = {
   d: string;
@@ -12,7 +13,7 @@ export type FillRegion = {
 };
 
 /** Must stay in step with the outline width in render.ts. */
-export const FILL_STROKE = 0.08;
+export const FILL_STROKE = 0.2;
 const SCALE = 40;
 
 function stampDisc(pix: Uint8Array, w: number, h: number, px: number, py: number, r: number): void {
@@ -30,7 +31,7 @@ function stampDisc(pix: Uint8Array, w: number, h: number, px: number, py: number
   }
 }
 
-function rasterizeStrokes(paths: string[], padding: number, W: number, scale: number): {
+function rasterizeStrokes(paths: string[], padding: number, W: number, scale: number, strokeWidth = FILL_STROKE): {
   pix: Uint8Array;
   w: number;
   h: number;
@@ -41,7 +42,7 @@ function rasterizeStrokes(paths: string[], padding: number, W: number, scale: nu
   const h = w;
   const pix = new Uint8Array(w * h);
   // Slightly thicker than half the outline so fills sit inside the stroke.
-  const radius = Math.max(1.4, (FILL_STROKE / 2 + 0.012) * scale);
+  const radius = Math.max(1.4, (strokeWidth / 2 + 0.012) * scale);
   const maxGap = 0.4;
 
   const toPx = (x: number, y: number): [number, number] => [(x + padding) * scale, (y + padding) * scale];
@@ -281,8 +282,10 @@ function ringOf(x: number, y: number, c: number): number {
  */
 export function colorRegions(pattern: KolamPattern, palette: readonly string[]): FillRegion[] {
   if (pattern.paths.length === 0 || palette.length === 0) return [];
-  const padding = 1.15;
-  const { pix, w, h, scale } = rasterizeStrokes(pattern.paths, padding, pattern.grid.W, SCALE);
+  const sp = dotSpacing(pattern.spec);
+  const padding = 1.15 * sp;
+  const strokeW = 0.2 * sp;
+  const { pix, w, h, scale } = rasterizeStrokes(pattern.paths, padding, pattern.grid.W, SCALE, strokeW);
   const labels = new Uint32Array(pix.length);
   const raw = extractRegions(pix, labels, w, h, scale, padding);
   if (raw.length === 0) return [];
@@ -309,12 +312,36 @@ export function colorRegions(pattern: KolamPattern, palette: readonly string[]):
   orbits.sort((a, b) => a.ring - b.ring || a.key.localeCompare(b.key));
 
   const rings = [...new Set(orbits.map((o) => o.ring))].sort((a, b) => a - b);
-  const ringIndex = new Map(rings.map((r, i) => [r, i]));
+  const maxRing = rings.length ? rings[rings.length - 1] : 0;
+  const minRing = rings.length ? rings[0] : 0;
+  const areas = orbits.map((o) => o.mid.area).sort((a, b) => a - b);
+  const medianArea = areas.length ? areas[Math.floor(areas.length / 2)] : 0;
+
+  type Kind = "center" | "petal" | "accent" | "skip";
+  function classify(orbit: (typeof orbits)[number]): Kind {
+    const small = orbit.mid.area <= medianArea * 0.95;
+    const verySmall = orbit.mid.area <= medianArea * 0.55;
+    const isCenter = orbit.ring <= minRing + Math.max(0.75, maxRing * 0.16);
+    const isOuter = orbit.ring >= maxRing * 0.62;
+    const midBand = orbit.ring > minRing + 0.5 && orbit.ring < maxRing * 0.48;
+    if (isCenter && !isOuter) return "center";
+    if (isOuter && (small || verySmall)) return "petal";
+    if (midBand && verySmall) return "accent";
+    return "skip";
+  }
+
+  const colorFor: Record<Exclude<Kind, "skip">, string> = {
+    center: palette[0] ?? "#c0392b",
+    petal: palette[1] ?? palette[0] ?? "#e1b12c",
+    accent: palette[2] ?? palette[0] ?? "#2d6a4f",
+  };
 
   const out: FillRegion[] = [];
   const seen = new Set<string>();
   for (const orbit of orbits) {
-    const fill = palette[(ringIndex.get(orbit.ring) ?? 0) % palette.length];
+    const kind = classify(orbit);
+    if (kind === "skip") continue;
+    const fill = colorFor[kind];
     const src = orbit.mid;
     for (let t = 0; t < 8; t++) {
       const [cx, cy] = d4Point(src.cx, src.cy, t, c);

@@ -5,7 +5,7 @@ import { generateKolam, kolamOfTheDay, type KolamPattern } from "./generator";
 import { hashString } from "./prng";
 import { kolamSvg, strokeEndTime } from "./render";
 import { THEMES, type ThemeId } from "./themes";
-import { festivalOn } from "./festivals";
+import { festivalOn, festivalChipText } from "./festivals";
 import {
   selectPendingGrid,
   styleFestivalId,
@@ -23,7 +23,7 @@ import "./style.css";
 import {
   KOLAM_WHATSAPP_URL,
   facebookShareUrl,
-  shareText,
+  nativeShareData,
   type ShareContext,
   whatsappShareUrl,
   xShareUrl,
@@ -154,7 +154,8 @@ function applyTheme(themeId: ThemeId): void {
 }
 
 function seededColor(state: State): boolean {
-  return defaultColorMode(state.mode === "daily" ? Math.max(kolamNumber(state.date), 0) : state.seed);
+  const fest = state.mode === "daily" && Boolean(festivalOn(state.date));
+  return defaultColorMode(0, fest);
 }
 
 function themeForStyle(style: KolamStyleId): ThemeId {
@@ -256,7 +257,7 @@ function renderChrome(state: State): void {
     next.setAttribute("aria-disabled", isToday ? "true" : "false");
     prev.href = `${root}${datePath(addDays(state.date, -1))}`;
     next.href = isToday ? "#" : `${root}${datePath(addDays(state.date, 1))}`;
-    back.hidden = isToday;
+    back.hidden = true;
     canvasLabel.hidden = true;
   } else {
     hero.textContent = `Your kolam · ${label}`;
@@ -272,8 +273,7 @@ function renderChrome(state: State): void {
   const chip = $("festival-chip");
   if (fest) {
     chip.hidden = false;
-    chip.textContent =
-      fest.dayLabel && fest.dayLabel !== fest.name ? `${fest.greeting} · ${fest.dayLabel}` : fest.greeting;
+    chip.textContent = festivalChipText(fest);
   } else {
     chip.hidden = true;
     chip.textContent = "";
@@ -319,9 +319,7 @@ function loadDaily(date: string): Pick<
   const fest = festivalOn(clamped);
   const styleId: KolamStyleId = fest
     ? styleForFestival(fest.id)
-    : defaultColorMode(Math.max(kolamNumber(clamped), 0))
-      ? "color"
-      : "line";
+    : "line";
   return {
     mode: "daily",
     date: clamped,
@@ -350,8 +348,7 @@ async function savePng(state: State): Promise<void> {
 
 async function shareKolam(state: State): Promise<void> {
   const ctx = shareContext(state);
-  const text = shareText(ctx);
-  const title = "கோலம் · Kolam";
+  const payload: ShareData = nativeShareData(ctx);
   try {
     const svg = $("stage").querySelector("svg");
     const width = svg ? svg.getBoundingClientRect().width : 320;
@@ -361,7 +358,6 @@ async function shareKolam(state: State): Promise<void> {
         ? pngFilename("daily", state.date)
         : pngFilename("generated", `${state.gridId}-${state.seed}`);
     const file = new File([blob], name, { type: "image/png" });
-    const payload: ShareData = { title, text, url: ctx.url };
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ ...payload, files: [file] });
       return;
@@ -699,14 +695,15 @@ function init(): void {
 
   const generatedBase = parsed.mode === "generated";
   const initStyle: KolamStyleId = generatedBase
-    ? (defaultColorMode(base.seed) ? "color" : "line")
+    ? "line"
     : (base as { styleId?: KolamStyleId }).styleId ?? "line";
+  const festDefault = !generatedBase && Boolean(festivalOn(base.date));
   const state: State = {
     ...base,
     styleId: initStyle,
     pendingGridId: base.gridId,
     pendingStyleId: generatedBase ? "auto" : "auto",
-    color: pref ?? styleUsesColor(initStyle, defaultColorMode(base.mode === "daily" ? Math.max(kolamNumber(base.date), 0) : base.seed)),
+    color: pref ?? styleUsesColor(initStyle, defaultColorMode(0, festDefault)),
     colorOverridden: pref !== null,
     drawMode: "view",
     watchSpeed: "slow",

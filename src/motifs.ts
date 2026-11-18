@@ -7,6 +7,31 @@ function g(inner: string, x: number, y: number, s: number, rot = 0): string {
   return `<g transform="translate(${x} ${y})${r} scale(${s})">${inner}</g>`;
 }
 
+/** Keep a motif of the given radius fully inside the stone tile (viewBox). */
+function clampToTile(x: number, y: number, W: number, pad: number, radius: number): { x: number; y: number } {
+  const lo = -pad + radius;
+  const hi = W + pad - radius;
+  const cx = W / 2;
+  const cy = W / 2;
+  let nx = Math.min(hi, Math.max(lo, x));
+  let ny = Math.min(hi, Math.max(lo, y));
+  // Extra inset on the rounded-corner diagonals so lamps aren't clipped by the tile's border-radius.
+  const corner = pad * 0.35 + radius * 0.25;
+  const nearLeft = nx - lo < corner;
+  const nearRight = hi - nx < corner;
+  const nearTop = ny - lo < corner;
+  const nearBottom = hi - ny < corner;
+  if ((nearLeft || nearRight) && (nearTop || nearBottom)) {
+    const dx = nx < cx ? 1 : -1;
+    const dy = ny < cy ? 1 : -1;
+    nx += dx * corner;
+    ny += dy * corner;
+    nx = Math.min(hi, Math.max(lo, nx));
+    ny = Math.min(hi, Math.max(lo, ny));
+  }
+  return { x: nx, y: ny };
+}
+
 const LAMP = `<g class="motif-lamp">
   <ellipse class="lamp-glow" cx="0" cy="-0.55" rx="0.55" ry="0.7" fill="#ffd278" opacity="0.28"/>
   <ellipse cx="0" cy="-0.55" rx="0.16" ry="0.3" fill="#ffe9a0"/>
@@ -63,7 +88,7 @@ const KALASH = `<g class="motif-kalash">
   <path d="M0 -0.4 C0.2 -0.7 0.35 -0.5 0.12 -0.3" fill="none" stroke="#2d6a4f" stroke-width="0.05" stroke-linecap="round"/>
 </g>`;
 
-function tipPoints(W: number, paths: string[] | undefined, count: 4 | 8): Array<{ x: number; y: number; deg: number }> {
+function tipPoints(W: number, paths: string[] | undefined, count: 4 | 8, pad: number): Array<{ x: number; y: number; deg: number }> {
   const c = W / 2;
   const tips: Array<{ x: number; y: number; deg: number }> = [];
   for (let i = 0; i < count; i++) {
@@ -90,21 +115,23 @@ function tipPoints(W: number, paths: string[] | undefined, count: 4 | 8): Array<
       }
     }
     const reach = Math.hypot(bx - c, by - c) || c;
-    const x = c + (reach + 0.72) * ux;
-    const y = c + (reach + 0.72) * uy;
+    const rawX = c + (reach + 0.4) * ux;
+    const rawY = c + (reach + 0.4) * uy;
+    const lampR = 1.35;
+    const { x, y } = clampToTile(rawX, rawY, W, pad, lampR);
     tips.push({ x, y, deg: (a * 180) / Math.PI + 90 });
   }
   return tips;
 }
 
-function lampsAround(W: number, count: 4 | 8, scale: number, paths?: string[]): string {
-  return tipPoints(W, paths, count)
+function lampsAround(W: number, count: 4 | 8, scale: number, paths: string[] | undefined, pad: number): string {
+  return tipPoints(W, paths, count, pad)
     .map((t) => g(LAMP, t.x, t.y, scale, t.deg))
     .join("");
 }
 
-function cornerHorns(W: number): string {
-  const inset = -0.15;
+function cornerHorns(W: number, _pad: number): string {
+  const inset = 0.2;
   const corners = [
     { x: inset, y: inset, rot: 0 },
     { x: W - inset, y: inset, rot: 90 },
@@ -145,22 +172,34 @@ function flowerRings(W: number): string {
  * Festival motifs placed in the padding around (and sometimes at the center of)
  * the kolam, always in a 4- or 8-fold arrangement.
  */
-export function motifSvg(style: KolamStyleId, W: number, paths?: string[]): string {
+export function motifSvg(style: KolamStyleId, W: number, paths?: string[], pad = 3.2): string {
   const c = W / 2;
-  const lampScale = 0.95;
+  const lampScale = 0.85;
+  const pot = (x: number, y: number, s: number, rot = 0) => {
+    const p = clampToTile(x, y, W, pad, 0.55 * s + 0.15);
+    return g(POT, p.x, p.y, s, rot);
+  };
+  const cane = (x: number, y: number, s: number, rot = 0) => {
+    const p = clampToTile(x, y, W, pad, 0.8 * s + 0.15);
+    return g(CANE, p.x, p.y, s, rot);
+  };
+  const kalash = (x: number, y: number, s: number, rot = 0) => {
+    const p = clampToTile(x, y, W, pad, 0.7 * s + 0.15);
+    return g(KALASH, p.x, p.y, s, rot);
+  };
   switch (style) {
     case "diwali":
-      return `<g class="motifs motifs-diwali">${lampsAround(W, 8, lampScale, paths)}${cornerHorns(W)}</g>`;
+      return `<g class="motifs motifs-diwali">${lampsAround(W, 8, lampScale, paths, pad)}${cornerHorns(W, pad)}</g>`;
     case "karthigai":
-      return `<g class="motifs motifs-karthigai">${lampsAround(W, 8, lampScale, paths)}${g(LAMP, c, c, 0.8)}${cornerHorns(W)}</g>`;
+      return `<g class="motifs motifs-karthigai">${lampsAround(W, 8, lampScale, paths, pad)}${g(LAMP, c, c, 0.7)}${cornerHorns(W, pad)}</g>`;
     case "harvest":
-      return `<g class="motifs motifs-harvest">${g(SUN, c, c, 0.85)}${g(POT, c, W + 0.55, 0.42)}${g(CANE, -0.15, c, 0.42, -12)}${g(CANE, W + 0.15, c, 0.42, 12)}${g(CANE, c, -0.15, 0.42, 90)}${g(POT, c, -0.55, 0.28)}${g(POT, -0.5, c, 0.28)}${g(POT, W + 0.5, c, 0.28)}</g>`;
+      return `<g class="motifs motifs-harvest">${g(SUN, c, c, 0.85)}${pot(c, W + 0.35, 0.42)}${cane(0.2, c, 0.42, -12)}${cane(W - 0.2, c, 0.42, 12)}${cane(c, 0.2, 0.42, 90)}${pot(c, -0.2, 0.28)}${pot(-0.15, c, 0.28)}${pot(W + 0.15, c, 0.28)}</g>`;
     case "christmas":
       return `<g class="motifs motifs-christmas">${starsAround(W)}</g>`;
     case "onam":
       return `<g class="motifs motifs-onam">${flowerRings(W)}</g>`;
     case "navaratri":
-      return `<g class="motifs motifs-navaratri">${g(LOTUS, c, c, 0.7)}${g(KALASH, c, -0.45, 0.4)}${g(KALASH, c, W + 0.45, 0.4, 180)}${g(KALASH, -0.45, c, 0.4, -90)}${g(KALASH, W + 0.45, c, 0.4, 90)}</g>`;
+      return `<g class="motifs motifs-navaratri">${g(LOTUS, c, c, 0.7)}${kalash(c, -0.2, 0.4)}${kalash(c, W + 0.2, 0.4, 180)}${kalash(-0.2, c, 0.4, -90)}${kalash(W + 0.2, c, 0.4, 90)}</g>`;
     default:
       return "";
   }

@@ -100,6 +100,29 @@ export const CURATED_PATTERNS: CuratedPattern[] = [
   entry("d158-rosette", "15-8 rosette", "d158", "rosette", ["diwali", "karthigai"], { band: 1 }),
   entry("d158-center-chain", "15-8 axis chain", "d158", "center-chain"),
   entry("d158-lotus", "15-8 lotus", "d158", "lotus", "navaratri"),
+
+  // Small interlaced diamonds used for daily classics
+  entry("d232-cross-knot", "2-3-2 cross knot", "d232", "cross-knot"),
+  entry("d232-frame-petals", "2-3-2 frame petals", "d232", "frame-petals", "harvest"),
+  entry("d232-sparse-knots", "2-3-2 corner knots", "d232", "sparse-knots"),
+
+  entry("d2442-cross-knot", "2-4-4-2 cross knot", "d2442", "cross-knot"),
+  entry("d2442-center-chain", "2-4-4-2 axis chain", "d2442", "center-chain"),
+  entry("d2442-frame-petals", "2-4-4-2 frame petals", "d2442", "frame-petals", "harvest"),
+  entry("d2442-star-diag", "2-4-4-2 star", "d2442", "star-diag", ["christmas", "newyear"]),
+
+  entry("d23432-cross-knot", "2-3-4-3-2 cross knot", "d23432", "cross-knot"),
+  entry("d23432-center-chain", "2-3-4-3-2 axis chain", "d23432", "center-chain"),
+  entry("d23432-rosette", "2-3-4-3-2 rosette", "d23432", "rosette", ["diwali", "karthigai"]),
+  entry("d23432-lotus", "2-3-4-3-2 lotus", "d23432", "lotus"),
+  entry("d23432-frame-petals", "2-3-4-3-2 frame petals", "d23432", "frame-petals", "harvest"),
+
+  entry("d34543-cross-knot", "3-4-5-4-3 cross knot", "d34543", "cross-knot"),
+  entry("d34543-center-chain", "3-4-5-4-3 axis chain", "d34543", "center-chain"),
+  entry("d34543-rosette", "3-4-5-4-3 rosette", "d34543", "rosette", ["diwali", "karthigai"]),
+  entry("d34543-lotus", "3-4-5-4-3 lotus", "d34543", "lotus", "navaratri"),
+  entry("d34543-sparse-knots", "3-4-5-4-3 corner knots", "d34543", "sparse-knots"),
+  entry("d34543-star-diag", "3-4-5-4-3 star", "d34543", "star-diag", ["christmas", "newyear"]),
 ];
 
 export function hasFestival(pattern: CuratedPattern, id: FestivalId): boolean {
@@ -113,6 +136,13 @@ export function curatedForGrid(id: GridId): CuratedPattern[] {
 
 export function curatedForFestival(id: FestivalId): CuratedPattern[] {
   return CURATED_PATTERNS.filter((p) => hasFestival(p, id));
+}
+
+/** Classics in an order that prefers interlaced diamonds for the daily series. */
+export function dailyCatalog(): CuratedPattern[] {
+  // Daily classics stay on interlaced diamonds, not large square lattices.
+  const diamonds = CURATED_PATTERNS.filter((p) => p.gridId.startsWith("d"));
+  return diamonds.length ? diamonds : CURATED_PATTERNS.slice();
 }
 
 /** Exact traditional configuration, then a coverage-only D4 polish. */
