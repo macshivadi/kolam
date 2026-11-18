@@ -33,10 +33,10 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
   const rowDelay = 0.07;
   const strokeDelay = 0.45 + pattern.grid.max * rowDelay;
   const paths = pattern.paths
-    .map((d, i) => {
+    .map((d) => {
       const delay = opts.static
         ? ""
-        : ` style="animation-delay:${(strokeDelay + i * 0.35).toFixed(2)}s"`;
+        : ` style="animation-delay:${strokeDelay.toFixed(2)}s"`;
       return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay}/>`;
     })
     .join("\n");
