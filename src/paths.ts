@@ -28,11 +28,18 @@ export function ogImageUrl(siteUrl: string, dateStr: string): string {
   return `${datePageUrl(siteUrl, dateStr)}og.svg`;
 }
 
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** 'Nov 18' — month and day of a YYYY-MM-DD local date. */
+export function monthDayLabel(dateStr: string): string {
+  const [, m, d] = dateStr.split("-").map(Number);
+  return `${MONTHS_SHORT[m - 1]} ${d}`;
+}
+
 /** 'Nov 18, 2026' — used in <title> and share cards. */
 export function shortDateLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[m - 1]} ${d}, ${y}`;
+  const [y] = dateStr.split("-").map(Number);
+  return `${monthDayLabel(dateStr)}, ${y}`;
 }
 
 export function pageTitle(dateStr: string, festivalName?: string): string {

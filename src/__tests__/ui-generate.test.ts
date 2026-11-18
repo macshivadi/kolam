@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRIDS, GRID_IDS, type GridId } from "../grid";
+import { GRID_IDS, specFor } from "../grid";
 import { generateKolam, kolamOfTheDay, type KolamPattern } from "../generator";
 import { LAUNCH_DATE } from "../dateSeed";
 import { selectPendingGrid, type KolamStyleId } from "../styles";
@@ -7,10 +7,10 @@ import { selectPendingGrid, type KolamStyleId } from "../styles";
 type UiState = {
   mode: "daily" | "generated";
   pattern: KolamPattern;
-  pendingGridId: GridId;
+  pendingGridId: string;
   pendingStyleId: KolamStyleId;
   styleId: KolamStyleId;
-  gridId: GridId;
+  gridId: string;
 };
 
 describe("Create your own chips", () => {
@@ -47,7 +47,7 @@ describe("Create your own chips", () => {
     };
     state = selectPendingGrid(state, "5x5");
     expect(state.pattern.spec.id).not.toBe("5x5");
-    const generated = generateKolam(GRIDS[state.pendingGridId], 4242);
+    const generated = generateKolam(specFor(state.pendingGridId)!, 4242);
     const after: UiState = {
       ...state,
       mode: "generated",

@@ -337,11 +337,11 @@ export function loopToPath(loop: Loop): string {
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
     const dot = tA[0] * tB[0] + tA[1] * tB[1];
     let alphaScale: number;
-    if (isTightPetal(loop, i)) alphaScale = 0.44;
-    else if (bouncedA && bouncedB) alphaScale = 0.46;
-    else if (dot > 0.65) alphaScale = 0.62;
-    else if (dot > 0.2) alphaScale = 0.54;
-    else alphaScale = 0.4;
+    if (isTightPetal(loop, i)) alphaScale = 0.52;
+    else if (bouncedA && bouncedB) alphaScale = 0.5;
+    else if (dot > 0.65) alphaScale = 0.58;
+    else if (dot > 0.2) alphaScale = 0.5;
+    else alphaScale = 0.42;
     const alpha = dist * alphaScale;
     const c1x = a.x + tA[0] * alpha;
     const c1y = a.y + tA[1] * alpha;

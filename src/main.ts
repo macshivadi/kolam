@@ -1,9 +1,9 @@
 import { addDays, clampToPastOrToday, isValidDateString, kolamNumber, localDateString } from "./dateSeed";
 import { appRootFromPathname, datePath, datePageUrl, parseDatePath, resolveSiteUrl } from "./paths";
-import { GRIDS, GRID_IDS, pulliLabel, type GridId } from "./grid";
+import { GRID_IDS, pulliLabel, specFor, isCustomGridId, validateCustomGrid, parseCustomGridId, type GridId } from "./grid";
 import { generateKolam, kolamOfTheDay, type KolamPattern } from "./generator";
 import { hashString } from "./prng";
-import { kolamSvg, strokeEndTime } from "./render";
+import { kolamSvg, strokeEndTime, strokeWidthFor } from "./render";
 import { THEMES, type ThemeId } from "./themes";
 import { festivalOn, festivalChipText } from "./festivals";
 import {
@@ -19,6 +19,7 @@ import { playDrawAlongSound, setSoundEnabled, soundEnabled } from "./sound";
 import { defaultColorMode, rangoliPalette } from "./palettes";
 import { colorRegions, type FillRegion } from "./regions";
 import { buildSampledPath, pointAtLength, type SampledPath } from "./trace";
+import { pathDurationMs, type WatchSpeed } from "./drawSpeed";
 import "./style.css";
 import {
   KOLAM_WHATSAPP_URL,
@@ -35,7 +36,7 @@ type DrawMode = "view" | "watch";
 type State = {
   mode: Mode;
   date: string;
-  gridId: GridId;
+  gridId: string;
   seed: number;
   themeId: ThemeId;
   themeOverridden: boolean;
@@ -43,11 +44,11 @@ type State = {
   color: boolean;
   colorOverridden: boolean;
   drawMode: DrawMode;
-  watchSpeed: "slow" | "normal";
+  watchSpeed: WatchSpeed;
   /** Style currently drawn on the canvas. */
   styleId: KolamStyleId;
   /** Grid chosen in Create your own; does not redraw until Generate. */
-  pendingGridId: GridId;
+  pendingGridId: string;
   /** Style chosen in Create your own; does not redraw until Generate. */
   pendingStyleId: KolamStyleId;
 };
@@ -70,16 +71,16 @@ function siteBase(): string {
   return resolveSiteUrl() || local;
 }
 
-function parseUrl(): { mode: Mode; date: string; gridId: GridId; seed: number } {
+function parseUrl(): { mode: Mode; date: string; gridId: string; seed: number } {
   const params = new URLSearchParams(window.location.search);
   const dateParam = params.get("date");
   const gridParam = params.get("grid");
   const seedParam = params.get("seed");
   const now = today();
-  if (seedParam && gridParam && GRID_IDS.includes(gridParam as GridId)) {
+  if (seedParam && gridParam && specFor(gridParam)) {
     const seed = Number(seedParam);
     if (Number.isFinite(seed)) {
-      return { mode: "generated", date: now, gridId: gridParam as GridId, seed: seed >>> 0 };
+      return { mode: "generated", date: now, gridId: gridParam, seed: seed >>> 0 };
     }
   }
   const pathDate = parseDatePath(window.location.pathname);
@@ -239,6 +240,60 @@ function renderStage(state: State, opts: { slow?: boolean; static?: boolean } = 
   revealTimer = window.setTimeout(onEnd, waitMs);
 }
 
+
+function setCustomError(message: string | null): void {
+  const el = document.getElementById("custom-error");
+  if (!el) return;
+  if (message) {
+    el.hidden = false;
+    el.textContent = message;
+  } else {
+    el.hidden = true;
+    el.textContent = "";
+  }
+}
+
+function readCustomDraft(): ReturnType<typeof validateCustomGrid> {
+  const shape = (document.querySelector('input[name="custom-shape"]:checked') as HTMLInputElement | null)?.value ?? "square";
+  const rows = Number((document.getElementById("custom-rows") as HTMLInputElement | null)?.value);
+  const cols = Number((document.getElementById("custom-cols") as HTMLInputElement | null)?.value);
+  const center = Number((document.getElementById("custom-center") as HTMLInputElement | null)?.value);
+  return validateCustomGrid({ shape, rows, cols, center });
+}
+
+function showCustomFields(shape: string): void {
+  const sq = document.getElementById("custom-square-fields");
+  const dia = document.getElementById("custom-diamond-fields");
+  if (sq) sq.hidden = shape !== "square";
+  if (dia) dia.hidden = shape !== "diamond";
+}
+
+function syncCustomPanel(state: State): void {
+  const panel = document.getElementById("custom-grid");
+  const customBtn = document.getElementById("grid-custom");
+  const usingCustom = isCustomGridId(state.pendingGridId) || state.pendingGridId === "custom";
+  if (panel) panel.hidden = !usingCustom;
+  customBtn?.setAttribute("aria-pressed", String(usingCustom));
+  const parsed = parseCustomGridId(state.pendingGridId);
+  if (!parsed || !usingCustom) return;
+  if (parsed.kind === "square") {
+    const shape = document.querySelector('input[name="custom-shape"][value="square"]') as HTMLInputElement | null;
+    if (shape) shape.checked = true;
+    showCustomFields("square");
+    const rows = document.getElementById("custom-rows") as HTMLInputElement | null;
+    const cols = document.getElementById("custom-cols") as HTMLInputElement | null;
+    if (rows) rows.value = String(parsed.nr ?? parsed.n);
+    if (cols) cols.value = String(parsed.nc ?? parsed.n);
+  } else {
+    const shape = document.querySelector('input[name="custom-shape"][value="diamond"]') as HTMLInputElement | null;
+    if (shape) shape.checked = true;
+    showCustomFields("diamond");
+    const center = document.getElementById("custom-center") as HTMLInputElement | null;
+    const mid = parsed.rows ? Math.max(...parsed.rows) : 5;
+    if (center) center.value = String(mid);
+  }
+}
+
 function renderChrome(state: State): void {
   const now = today();
   const isToday = state.date === now;
@@ -257,7 +312,8 @@ function renderChrome(state: State): void {
     next.setAttribute("aria-disabled", isToday ? "true" : "false");
     prev.href = `${root}${datePath(addDays(state.date, -1))}`;
     next.href = isToday ? "#" : `${root}${datePath(addDays(state.date, 1))}`;
-    back.hidden = true;
+    back.hidden = isToday;
+    back.textContent = "Back to today";
     canvasLabel.hidden = true;
   } else {
     hero.textContent = `Your kolam · ${label}`;
@@ -266,6 +322,7 @@ function renderChrome(state: State): void {
     prev.href = "#";
     next.href = "#";
     back.hidden = false;
+    back.textContent = "Back to today";
     canvasLabel.hidden = false;
   }
 
@@ -280,8 +337,11 @@ function renderChrome(state: State): void {
   }
 
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
-    btn.setAttribute("aria-pressed", String(btn.dataset.grid === state.pendingGridId));
+    const id = btn.dataset.grid ?? "";
+    const pressed = id === "custom" ? isCustomGridId(state.pendingGridId) || state.pendingGridId === "custom" : id === state.pendingGridId;
+    btn.setAttribute("aria-pressed", String(pressed));
   });
+  syncCustomPanel(state);
   $("color-white").setAttribute("aria-pressed", String(!state.color));
   $("color-on").setAttribute("aria-pressed", String(state.color));
 
@@ -428,8 +488,16 @@ function stopWatch(): void {
   watchRun = null;
 }
 
-function perLoopMs(speed: "slow" | "normal"): number {
-  return speed === "slow" ? 6500 : 3200;
+function loopDurationMs(run: WatchRun, speed: WatchSpeed): number {
+  const path = run.sampled[run.loop];
+  return pathDurationMs(path?.length ?? 1, speed);
+}
+
+function syncSpeedButtons(speed: WatchSpeed): void {
+  for (const id of ["slow", "normal", "fast"] as const) {
+    const el = document.getElementById(`speed-${id}`);
+    el?.setAttribute("aria-pressed", String(speed === id));
+  }
 }
 
 function setPathOffset(path: SVGPathElement, offset: number, drawn: boolean): void {
@@ -439,14 +507,19 @@ function setPathOffset(path: SVGPathElement, offset: number, drawn: boolean): vo
   path.classList.toggle("is-drawn", drawn);
 }
 
-function ensureFingertip(svg: SVGSVGElement): SVGCircleElement {
+/** Diameter is 1.35× the thin stroke, so the marker sits on the line. */
+function fingertipRadius(state: State): number {
+  return strokeWidthFor(state.pattern.spec) * 0.675;
+}
+
+function ensureFingertip(svg: SVGSVGElement, radius: number): SVGCircleElement {
   let el = svg.querySelector<SVGCircleElement>(".fingertip");
   if (!el) {
     el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     el.setAttribute("class", "fingertip");
-    el.setAttribute("r", "0.16");
     svg.appendChild(el);
   }
+  el.setAttribute("r", radius.toFixed(4));
   return el;
 }
 
@@ -458,11 +531,12 @@ function tickWatch(state: State, ts: number): void {
   run.elapsed += dt;
   const svg = $("stage").querySelector("svg");
   const paths = svg?.querySelectorAll<SVGPathElement>(".kolam-path") ?? [];
-  const dur = perLoopMs(state.watchSpeed);
-  while (run.loop < run.sampled.length && run.elapsed >= dur) {
+  while (run.loop < run.sampled.length) {
+    const loopMs = loopDurationMs(run, state.watchSpeed);
+    if (run.elapsed < loopMs) break;
     const done = paths[run.loop];
     if (done) setPathOffset(done, 0, true);
-    run.elapsed -= dur;
+    run.elapsed -= loopMs;
     run.loop += 1;
   }
   if (run.loop >= run.sampled.length) {
@@ -474,14 +548,22 @@ function tickWatch(state: State, ts: number): void {
     $("watch-pause").textContent = "Replay";
     return;
   }
+  const dur = loopDurationMs(run, state.watchSpeed);
   const t = Math.min(1, run.elapsed / dur);
   paths.forEach((p, i) => {
     if (i < run.loop) setPathOffset(p, 0, true);
     else if (i === run.loop) setPathOffset(p, 1 - t, false);
     else setPathOffset(p, 1, false);
   });
-  const path = run.sampled[run.loop];
-  if (run.fingertip && path) {
+  const el = paths[run.loop];
+  if (run.fingertip && el) {
+    const len = el.getTotalLength();
+    const pt = el.getPointAtLength(Math.max(0, Math.min(1, t)) * len);
+    run.fingertip.setAttribute("cx", String(pt.x));
+    run.fingertip.setAttribute("cy", String(pt.y));
+    run.fingertip.style.display = "";
+  } else if (run.fingertip && run.sampled[run.loop]) {
+    const path = run.sampled[run.loop];
     const pt = pointAtLength(path, t * path.length);
     run.fingertip.setAttribute("cx", String(pt.x));
     run.fingertip.setAttribute("cy", String(pt.y));
@@ -501,7 +583,7 @@ function startWatch(state: State, fromTop = true): void {
   paths.forEach((p) => setPathOffset(p, fromTop ? 1 : 0, false));
   const fills = svg.querySelector(".kolam-fills");
   if (fills) fills.classList.remove("is-colored");
-  const fingertip = ensureFingertip(svg as SVGSVGElement);
+  const fingertip = ensureFingertip(svg as SVGSVGElement, fingertipRadius(state));
   watchRun = {
     raf: 0,
     playing: true,
@@ -579,31 +661,40 @@ function wire(state: State): void {
   $("replay").addEventListener("click", () => {
     state.drawMode = "watch";
     showDrawPanel();
-    $("speed-slow").setAttribute("aria-pressed", String(state.watchSpeed === "slow"));
-    $("speed-normal").setAttribute("aria-pressed", String(state.watchSpeed === "normal"));
+    syncSpeedButtons(state.watchSpeed);
     startWatch(state, true);
   });
   $("draw-close").addEventListener("click", () => exitDrawAlong(state));
   $("watch-pause").addEventListener("click", () => toggleWatchPause(state));
-  $("speed-slow").addEventListener("click", () => {
-    state.watchSpeed = "slow";
-    $("speed-slow").setAttribute("aria-pressed", "true");
-    $("speed-normal").setAttribute("aria-pressed", "false");
-    if (state.drawMode === "watch") startWatch(state, true);
-  });
-  $("speed-normal").addEventListener("click", () => {
-    state.watchSpeed = "normal";
-    $("speed-slow").setAttribute("aria-pressed", "false");
-    $("speed-normal").setAttribute("aria-pressed", "true");
-    if (state.drawMode === "watch") startWatch(state, true);
-  });
+  for (const id of ["slow", "normal", "fast"] as const) {
+    document.getElementById(`speed-${id}`)?.addEventListener("click", () => {
+      state.watchSpeed = id;
+      syncSpeedButtons(id);
+      if (state.drawMode === "watch") startWatch(state, true);
+    });
+  }
   $("stage").addEventListener("click", (ev) => ev.preventDefault());
 
   $("generate").addEventListener("click", () => {
+    let gridId = state.pendingGridId;
+    if (isCustomGridId(gridId) || gridId === "custom" || !(document.getElementById("custom-grid")?.hidden ?? true)) {
+      const draft = readCustomDraft();
+      if (!draft.ok) {
+        setCustomError(draft.error);
+        return;
+      }
+      setCustomError(null);
+      gridId = draft.spec.id;
+      state.pendingGridId = gridId;
+    }
+    const spec = specFor(gridId);
+    if (!spec) {
+      setCustomError("Choose a valid grid before generating.");
+      return;
+    }
     const seed = freshSeed();
-    const gridId = state.pendingGridId;
     const styleId: KolamStyleId = state.color ? "color" : "line";
-    const pattern = generateKolam(GRIDS[gridId], seed);
+    const pattern = generateKolam(spec, seed);
     state.colorOverridden = false;
     setPattern(state, {
       mode: "generated",
@@ -647,8 +738,22 @@ function wire(state: State): void {
 
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = btn.dataset.grid as GridId;
-      if (!GRID_IDS.includes(id)) return;
+      const id = btn.dataset.grid ?? "";
+      if (id === "custom") {
+        const draft = readCustomDraft();
+        const pending = draft.ok ? draft.spec.id : "custom";
+        Object.assign(state, selectPendingGrid(state, pending));
+        const panel = document.getElementById("custom-grid");
+        if (panel) panel.hidden = false;
+        showCustomFields((document.querySelector('input[name="custom-shape"]:checked') as HTMLInputElement | null)?.value ?? "square");
+        setCustomError(draft.ok ? null : draft.error);
+        renderChrome(state);
+        return;
+      }
+      if (!GRID_IDS.includes(id as GridId)) return;
+      const panel = document.getElementById("custom-grid");
+      if (panel) panel.hidden = true;
+      setCustomError(null);
       // Select only — today's kolam and the canvas stay put until Generate.
       Object.assign(state, selectPendingGrid(state, id));
       renderChrome(state);
@@ -673,6 +778,24 @@ function wire(state: State): void {
   sound.addEventListener("change", () => setSoundEnabled(sound.checked));
 
   ($("wa-contact") as HTMLAnchorElement).href = KOLAM_WHATSAPP_URL;
+
+  const onCustomChange = () => {
+    const draft = readCustomDraft();
+    showCustomFields((document.querySelector('input[name="custom-shape"]:checked') as HTMLInputElement | null)?.value ?? "square");
+    if (draft.ok) {
+      setCustomError(null);
+      Object.assign(state, selectPendingGrid(state, draft.spec.id));
+    } else {
+      setCustomError(draft.error);
+    }
+    renderChrome(state);
+  };
+  document.querySelectorAll('input[name="custom-shape"]').forEach((el) => {
+    el.addEventListener("change", onCustomChange);
+  });
+  for (const id of ["custom-rows", "custom-cols", "custom-center"]) {
+    document.getElementById(id)?.addEventListener("input", onCustomChange);
+  }
 }
 
 function init(): void {
@@ -689,7 +812,7 @@ function init(): void {
           seed: parsed.seed,
           themeId: "classic" as const,
           themeOverridden: false,
-          pattern: generateKolam(GRIDS[parsed.gridId], parsed.seed),
+          pattern: generateKolam(specFor(parsed.gridId)!, parsed.seed),
         }
       : loadDaily(parsed.date);
 

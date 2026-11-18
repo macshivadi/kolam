@@ -11,6 +11,7 @@ import {
   kolamOfTheDay,
   patternFromDailyRecord,
   prerenderWindow,
+  resolveDailyRecord,
   resolveDailySeries,
 } from "../src/generator.ts";
 import { DATE_PAGE_ASSET_PREFIX, DEFAULT_SITE_URL, datePath, normalizeSiteUrl } from "../src/paths.ts";
@@ -81,6 +82,19 @@ function main(): void {
   const lastLaunch = launchDays[launchDays.length - 1] ?? LAUNCH_DATE;
   const series = resolveDailySeries(lastLaunch);
   const byDate = new Map(series.map((r) => [r.date, r]));
+
+  const preDays = dates.filter((d) => d < LAUNCH_DATE);
+  if (preDays.length) {
+    const prior = new Set<string>();
+    let rec = resolveDailyRecord(preDays[0], prior, LAUNCH_DATE);
+    prior.add(rec.canonicalHash);
+    byDate.set(preDays[0], rec);
+    for (let i = 1; i < preDays.length; i++) {
+      rec = resolveDailyRecord(preDays[i], prior, LAUNCH_DATE, rec);
+      prior.add(rec.canonicalHash);
+      byDate.set(preDays[i], rec);
+    }
+  }
 
   for (const date of dates) {
     const rec = byDate.get(date);

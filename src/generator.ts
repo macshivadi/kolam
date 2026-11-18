@@ -11,12 +11,13 @@ import {
   type GridId,
   type GridSpec,
   type Point,
+  boundingN,
 } from "./grid";
 import { type MirrorGrid } from "./mirrors";
 import { loopToPath, traceLoops, type Loop } from "./tracer";
 import { canonicalGeometryHash } from "./canonical";
 import { constructSymmetricKolam } from "./construct";
-import { applyCurated, curatedForFestival, dailyCatalog } from "./library";
+import { applyCurated, curatedForFestival, curatedForGrid } from "./library";
 import { festivalOn } from "./festivals";
 
 export type KolamPattern = {
@@ -99,7 +100,7 @@ export function generateKolam(
 ): KolamPattern {
   const attempts = opts.attempts ?? 8;
   let best: KolamPattern | null = null;
-  const cap = (spec.n ? spec.n + 1 : Math.max(...(spec.rows ?? [1])) + 1) * 4;
+  const cap = (boundingN(spec) + 1) * 4;
   for (let sub = 0; sub < attempts; sub++) {
     const s = attemptSeed(seed, sub);
     // Same traditional recipes as the curated library, with seed-unique
@@ -136,10 +137,53 @@ export const DAILY_ATTEMPTS = 64;
 
 export type DailyRecord = {
   date: string;
-  gridId: GridId;
+  gridId: string;
   subSeed: number;
   canonicalHash: string;
+  /** Curated catalog id, or a generated placement tag. */
+  patternId: string;
 };
+
+export type DailyPlacement = { grid: MirrorGrid; patternId: string };
+
+function wrapIndex(i: number, n: number): number {
+  return ((i % n) + n) % n;
+}
+
+/**
+ * Deterministic placement for a date and sub-seed. Curated classics on the
+ * day's cycle grid are tried first so adjacent days (different cycle grids)
+ * also get different patterns.
+ */
+export function placeDaily(
+  dateStr: string,
+  subSeed: number,
+  launch: string = LAUNCH_DATE,
+): DailyPlacement {
+  const spec = dailyGridSpec(dateStr, launch);
+  const s = attemptSeed(seedFromDate(dateStr), subSeed);
+  const fest = festivalOn(dateStr);
+  const dayIndex = daysBetween(dateStr, launch);
+
+  if (fest && subSeed < 8) {
+    const list = curatedForFestival(fest.id);
+    // Prefer a festival classic whose grid differs from the raw cycle
+    // neighbor by rotating through the festival list.
+    if (list.length) {
+      const p = list[wrapIndex(dayIndex + subSeed, list.length)];
+      return { grid: applyCurated(p), patternId: p.id };
+    }
+  }
+
+  const onGrid = curatedForGrid(spec.id);
+  if (onGrid.length && subSeed < onGrid.length) {
+    const p = onGrid[wrapIndex(dayIndex + subSeed, onGrid.length)];
+    return { grid: applyCurated(p), patternId: p.id };
+  }
+
+  const grid = constructSymmetricKolam(spec, s);
+  return { grid, patternId: `gen:${spec.id}:${subSeed}` };
+}
 
 /** Place the mirrors for a date and sub-seed (no tracing). Deterministic. */
 export function placeDailyMirrors(
@@ -147,25 +191,7 @@ export function placeDailyMirrors(
   subSeed: number,
   launch: string = LAUNCH_DATE,
 ): MirrorGrid {
-  const spec = dailyGridSpec(dateStr, launch);
-  const s = attemptSeed(seedFromDate(dateStr), subSeed);
-  const fest = festivalOn(dateStr);
-  const dayIndex = daysBetween(dateStr, launch);
-  const wrap = (i: number, n: number) => ((i % n) + n) % n;
-  // Festival days open with curated classics (may use a fitting traditional grid).
-  if (fest && subSeed < 8) {
-    const list = curatedForFestival(fest.id);
-    const diamonds = list.filter((p) => p.gridId.startsWith("d"));
-    const pick = diamonds.length ? diamonds : list;
-    if (pick.length) return applyCurated(pick[wrap(dayIndex + subSeed, pick.length)]);
-  }
-  // One curated attempt (sub-seed 0) so early days are classics without
-  // spending uniqueness-search time retracing the catalog every later day.
-  if (subSeed === 0) {
-    const catalog = dailyCatalog();
-    if (catalog.length) return applyCurated(catalog[wrap(dayIndex, catalog.length)]);
-  }
-  return constructSymmetricKolam(spec, s);
+  return placeDaily(dateStr, subSeed, launch).grid;
 }
 
 /**
@@ -176,20 +202,36 @@ export function resolveDailyRecord(
   dateStr: string,
   priorHashes: Set<string>,
   launch: string = LAUNCH_DATE,
+  previous?: { gridId: string; patternId: string },
 ): DailyRecord {
+  let fallback: DailyRecord | null = null;
   for (let sub = 0; sub < DAILY_ATTEMPTS; sub++) {
-    const grid = placeDailyMirrors(dateStr, sub, launch);
-    const key = canonicalGeometryHash(grid, traceLoops(grid).loops);
+    const placed = placeDaily(dateStr, sub, launch);
+    const key = canonicalGeometryHash(placed.grid, traceLoops(placed.grid).loops);
+    const rec: DailyRecord = {
+      date: dateStr,
+      gridId: placed.grid.spec.id,
+      subSeed: sub,
+      canonicalHash: key,
+      patternId: placed.patternId,
+    };
     if (priorHashes.has(key)) continue;
-    return { date: dateStr, gridId: grid.spec.id, subSeed: sub, canonicalHash: key };
+    const sameAsPrev =
+      previous && (rec.gridId === previous.gridId || rec.patternId === previous.patternId);
+    if (sameAsPrev) {
+      if (!fallback) fallback = rec;
+      continue;
+    }
+    return rec;
   }
-  // Extremely unlikely; still return a tagged last-attempt pattern.
-  const grid = placeDailyMirrors(dateStr, DAILY_ATTEMPTS, launch);
+  if (fallback) return fallback;
+  const placed = placeDaily(dateStr, DAILY_ATTEMPTS, launch);
   return {
     date: dateStr,
-    gridId: grid.spec.id,
+    gridId: placed.grid.spec.id,
     subSeed: DAILY_ATTEMPTS,
-    canonicalHash: canonicalGeometryHash(grid, traceLoops(grid).loops),
+    canonicalHash: canonicalGeometryHash(placed.grid, traceLoops(placed.grid).loops),
+    patternId: placed.patternId,
   };
 }
 
@@ -207,7 +249,8 @@ export function resolveDailySeries(
   if (n < 0) return out;
   for (let i = 0; i <= n; i++) {
     const date = addDays(launch, i);
-    const rec = resolveDailyRecord(date, prior, launch);
+    const prev = out.length ? out[out.length - 1] : undefined;
+    const rec = resolveDailyRecord(date, prior, launch, prev);
     prior.add(rec.canonicalHash);
     out.push(rec);
   }
@@ -261,9 +304,10 @@ export function kolamForDate(dateStr: string, launch: string = LAUNCH_DATE): Kol
   const prior = new Set<string>();
   const n = daysBetween(dateStr, begin);
   let rec = resolveDailyRecord(begin, prior, launch);
-  for (let i = 0; i <= n; i++) {
+  prior.add(rec.canonicalHash);
+  for (let i = 1; i <= n; i++) {
     const date = addDays(begin, i);
-    rec = resolveDailyRecord(date, prior, launch);
+    rec = resolveDailyRecord(date, prior, launch, rec);
     prior.add(rec.canonicalHash);
   }
   return patternFromDailyRecord(rec, launch);

@@ -1,5 +1,4 @@
 import type { FestivalId } from "./festivals";
-import type { GridId } from "./grid";
 
 /** Drawing styles the visitor can preview in Create your own. */
 export type KolamStyleId =
@@ -69,7 +68,7 @@ export function styleFestivalId(style: KolamStyleId): FestivalId | undefined {
 }
 
 /** Chip taps only update the pending selection — they must not redraw. */
-export function selectPendingGrid<T extends { pendingGridId: GridId }>(state: T, gridId: GridId): T {
+export function selectPendingGrid<T extends { pendingGridId: string }>(state: T, gridId: string): T {
   return { ...state, pendingGridId: gridId };
 }
 

@@ -10,17 +10,19 @@ import {
 } from "../generator";
 
 describe("daily grid cycle", () => {
-  it("cycles primarily through small and medium interlaced diamonds", () => {
+  it("rotates distinct families and never repeats a grid on adjacent cycle days", () => {
     expect(DAILY_GRID_CYCLE.length).toBeGreaterThanOrEqual(6);
-    const squares = DAILY_GRID_CYCLE.filter((id) => id.includes("x"));
-    const diamonds = DAILY_GRID_CYCLE.filter((id) => !id.includes("x"));
-    expect(diamonds.length).toBeGreaterThan(squares.length);
+    expect(new Set(DAILY_GRID_CYCLE).size).toBe(DAILY_GRID_CYCLE.length);
+    for (let i = 0; i < DAILY_GRID_CYCLE.length; i++) {
+      expect(DAILY_GRID_CYCLE[i]).not.toBe(DAILY_GRID_CYCLE[(i + 1) % DAILY_GRID_CYCLE.length]);
+    }
     expect(DAILY_GRID_CYCLE).toContain("d5");
     expect(DAILY_GRID_CYCLE).toContain("d7");
     expect(DAILY_GRID_CYCLE).toContain("d9");
     expect(DAILY_GRID_CYCLE).toContain("d23432");
     expect(DAILY_GRID_CYCLE).toContain("d34543");
-    expect(DAILY_GRID_CYCLE.filter((id) => id === "9x9").length).toBe(1);
+    expect(DAILY_GRID_CYCLE).toContain("5x5");
+    expect(DAILY_GRID_CYCLE).toContain("7x7");
     expect(DAILY_GRID_CYCLE).not.toContain("11x11");
     expect(dailyGridId(LAUNCH_DATE)).toBe(DAILY_GRID_CYCLE[0]);
     expect(dailyGridId(addDays(LAUNCH_DATE, DAILY_GRID_CYCLE.length))).toBe(DAILY_GRID_CYCLE[0]);
@@ -44,6 +46,19 @@ describe("daily uniqueness over ~10 years", () => {
     expect(new Set(hashes).size).toBe(3650);
     // Must stay fast enough for CI and for a client walk of prior days.
     expect(elapsed).toBeLessThan(20_000);
+  });
+
+  it("never repeats grid or pattern on adjacent days, and varies grids in each week", () => {
+    const series = resolveDailySeries(addDays(LAUNCH_DATE, 3649));
+    expect(series).toHaveLength(3650);
+    for (let i = 1; i < series.length; i++) {
+      expect(series[i].gridId, series[i].date).not.toBe(series[i - 1].gridId);
+      expect(series[i].patternId, series[i].date).not.toBe(series[i - 1].patternId);
+    }
+    for (let i = 0; i + 7 <= series.length; i++) {
+      const grids = new Set(series.slice(i, i + 7).map((r) => r.gridId));
+      expect(grids.size, series[i].date).toBeGreaterThanOrEqual(5);
+    }
   });
 
   it("is chronological and matches kolamOfTheDay for a sample of days", () => {

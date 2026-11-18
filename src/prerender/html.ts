@@ -175,7 +175,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
         ${showNext ? `<a id="next-day" class="icon-btn" rel="next" href="${nextHref}" aria-label="Next day">→</a>` : `<a id="next-day" class="icon-btn" href="#" aria-label="Next day" aria-disabled="true">→</a>`}
       </div>
       ${festChip}
-      <div class="hero-pills"><button type="button" id="back-today" class="pill" hidden>Today</button></div>
+      <div class="hero-pills"><button type="button" id="back-today" class="pill pill-back" hidden>Back to today</button></div>
       <p id="canvas-label" class="canvas-label" hidden>Your kolam</p>
       <div id="stage" class="stage" role="img" aria-label="${escapeHtml(title)}">
         ${svg}
@@ -191,6 +191,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
           <div class="speed" role="group" aria-label="Speed">
             <button type="button" id="speed-slow" data-speed="slow" aria-pressed="true">Slow</button>
             <button type="button" id="speed-normal" data-speed="normal">Normal</button>
+            <button type="button" id="speed-fast" data-speed="fast">Fast</button>
           </div>
           <button type="button" id="draw-close" class="pill">Done</button>
         </div>
@@ -210,7 +211,22 @@ export function buildDayPage(input: DayPageInput): DayPage {
         <button type="button" class="chip" data-grid="d9">9–1</button>
         <button type="button" class="chip" data-grid="d95">9–5</button>
         <button type="button" class="chip" data-grid="d158">15–8</button>
+        <button type="button" class="chip" id="grid-custom" data-grid="custom" aria-pressed="false">Custom</button>
       </fieldset>
+      <div id="custom-grid" class="custom-grid" hidden>
+        <div class="custom-shapes" role="group" aria-label="Custom shape">
+          <label class="custom-opt"><input type="radio" name="custom-shape" value="square" checked> Square</label>
+          <label class="custom-opt"><input type="radio" name="custom-shape" value="diamond"> Diamond interlaced</label>
+        </div>
+        <div id="custom-square-fields" class="custom-fields">
+          <label>Rows <input id="custom-rows" type="number" min="3" max="15" value="7" inputmode="numeric"></label>
+          <label>Cols <input id="custom-cols" type="number" min="3" max="15" value="7" inputmode="numeric"></label>
+        </div>
+        <div id="custom-diamond-fields" class="custom-fields" hidden>
+          <label>Center row <input id="custom-center" type="number" min="3" max="15" value="5" inputmode="numeric"></label>
+        </div>
+        <p id="custom-error" class="custom-error" hidden></p>
+      </div>
       <button type="button" id="generate" class="btn btn-primary">Generate</button>
     </details>
     <footer class="site-footer no-print">

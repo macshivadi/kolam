@@ -73,7 +73,8 @@ describe("sikku path drawing", () => {
       expect(isD4Symmetric(pattern.grid)).toBe(true);
       expect(pattern.uncovered).toEqual([]);
       expect(isolatedDotLoopCount(pattern)).toBe(0);
-      expect(pattern.paths.join(" ")).toMatch(/L/);
+      // Loops are smooth cubics (and occasional mid-edge lines).
+      expect(pattern.paths.join(" ")).toMatch(/[CL]/);
       // Strict D4 on even-width squares cannot reach a single loop
       // (the empty interior already has n+1 loops). Keep the count modest.
       expect(pattern.loopCount).toBeGreaterThanOrEqual(1);

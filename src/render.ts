@@ -61,17 +61,14 @@ export function drawDuration(opts: SvgOptions): number {
   return opts.slow ? 9.5 : 5.6;
 }
 
-function filterDefs(id: string, width: number, height: number, pad: number): string {
-  // Grain is kept very light so strokes stay visually closed.
+function filterDefs(id: string): string {
+  // Floor grain only. Stroke flour displacement was removed — it clumped
+  // the line into blobs at turns and crossings.
   return `  <defs>
     <filter id="floor-${id}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
       <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" seed="7" result="n"/>
       <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.09  0 0 0 0 0.06  0 0 0 0.16 0" result="grain"/>
       <feBlend in="SourceGraphic" in2="grain" mode="overlay"/>
-    </filter>
-    <filter id="flour-${id}" x="-${pad + 1}" y="-${pad + 1}" width="${width}" height="${height}" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="2" seed="4" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.045" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
   </defs>`;
 }
@@ -92,9 +89,8 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
   const padding = opts.padding ?? defaultPaddingFor(pattern, Boolean(motifs));
   const theme = opts.theme;
   const vb = viewBoxFor(pattern, padding);
-  const b = bounds(pattern, padding);
   const fid = opts.static ? "s" : opts.slow ? "q" : "k";
-  const animClass = opts.static ? "" : ' class="kolam-path"';
+  const animClass = opts.static ? ' class="kolam-path is-static"' : ' class="kolam-path"';
   const rowDelay = opts.slow ? 0.11 : 0.07;
   const drawSecs = drawDuration(opts);
   const strokeDelay = 0.45 + pattern.grid.max * rowDelay;
@@ -103,7 +99,7 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
       const delay = opts.static
         ? ""
         : ` style="animation-delay:${strokeDelay.toFixed(2)}s;animation-duration:${drawSecs.toFixed(2)}s"`;
-      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="${strokeWidthFor(pattern.spec)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay} filter="url(#flour-${fid})"/>`;
+      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="${strokeWidthFor(pattern.spec)}" stroke-linecap="butt" stroke-linejoin="round" pathLength="1"${delay}/>`;
     })
     .join("\n");
   const dots = pattern.grid.dots
@@ -122,9 +118,9 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
     })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">
-${filterDefs(fid, b.width + 2, b.height + 2, padding)}
+${filterDefs(fid)}
   <rect x="${-padding}" y="${-padding}" width="${pattern.grid.W + padding * 2}" height="${pattern.grid.W + padding * 2}" fill="${theme.floor}" filter="url(#floor-${fid})"/>
-  <g class="kolam-fills${opts.fills?.length && !opts.static ? "" : opts.fills?.length ? " is-colored" : ""}"${opts.fills?.length ? ` filter="url(#flour-${fid})"` : ""}>
+  <g class="kolam-fills${opts.fills?.length && !opts.static ? "" : opts.fills?.length ? " is-colored" : ""}">
 ${fillGroup(opts.fills)}
   </g>
   <g class="kolam-motifs" aria-hidden="true">${motifs}</g>

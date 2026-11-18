@@ -1,5 +1,4 @@
 import { hashString } from "./prng";
-import { type GridId } from "./grid";
 import { type Loop, type Mid } from "./tracer";
 import {
   type EdgeRef,
@@ -84,7 +83,7 @@ export function canonicalBits(grid: MirrorGrid): string {
  * Identity of a kolam pattern: grid id + D4-normalized hash of its mirrors.
  * Two patterns that are rotations or reflections of each other share this key.
  */
-export function canonicalHash(grid: MirrorGrid, gridId: GridId = grid.spec.id): string {
+export function canonicalHash(grid: MirrorGrid, gridId: string = grid.spec.id): string {
   const bits = canonicalBits(grid);
   return `${gridId}:${hashString(bits).toString(16).padStart(8, "0")}`;
 }
@@ -170,7 +169,7 @@ export function serializeLoopMidsReadable(mids: Mid[]): string {
  * reflection share this key.
  */
 export function canonicalGeometryHash(
-  grid: { spec: { id: GridId }; c: number },
+  grid: { spec: { id: string }; c: number },
   loops: Loop[],
 ): string {
   let best: string | null = null;

@@ -130,7 +130,7 @@ export function hasFestival(pattern: CuratedPattern, id: FestivalId): boolean {
   return Array.isArray(pattern.festival) ? pattern.festival.includes(id) : pattern.festival === id;
 }
 
-export function curatedForGrid(id: GridId): CuratedPattern[] {
+export function curatedForGrid(id: string): CuratedPattern[] {
   return CURATED_PATTERNS.filter((p) => p.gridId === id);
 }
 
