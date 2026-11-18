@@ -54,27 +54,27 @@
 
 html[data-ambience="dawn"] {
   --paper: #f7ead8;
-  --sky-top: #f2b9a8;
-  --sky-mid: #f6d0a8;
+  --sky-top: #f3a894;
+  --sky-mid: #f5c57a;
   --sky-bot: #f7ead8;
 }
 html[data-ambience="day"] {
   --paper: #f5eadc;
-  --sky-top: #f4d4bc;
+  --sky-top: #f3d2b6;
   --sky-mid: #f5eadc;
   --sky-bot: #f5eadc;
 }
 html[data-ambience="dusk"] {
-  --paper: #f0e4d6;
-  --sky-top: #d4c0dc;
-  --sky-mid: #edc8a6;
-  --sky-bot: #f0e4d6;
+  --paper: #efe3d4;
+  --sky-top: #c9b0d8;
+  --sky-mid: #e8b07a;
+  --sky-bot: #efe3d4;
   --lamp: #ffbe5c;
 }
 html[data-ambience="night"] {
   --paper: #ebe0d2;
-  --sky-top: #c8b4d0;
-  --sky-mid: #e0c4a8;
+  --sky-top: #c3a8d0;
+  --sky-mid: #dfb48a;
   --sky-bot: #ebe0d2;
   --lamp: #e8b86a;
 }
@@ -103,8 +103,8 @@ body {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(1100px 520px at 50% -8%, var(--sky-top), transparent 58%),
-    radial-gradient(800px 360px at 100% 0%, var(--sky-mid), transparent 50%),
+    radial-gradient(900px 380px at 50% 0%, var(--sky-top), transparent 62%),
+    radial-gradient(700px 280px at 100% 8%, var(--sky-mid), transparent 55%),
     var(--paper);
 }
 
@@ -163,7 +163,7 @@ body {
 .brand-text [lang="ta"] { font-family: var(--font-tamil); }
 .brand-text .dot { color: var(--accent); padding: 0 0.12em; }
 
-.lamp { display: inline-flex; align-items: center; margin-right: 4px; }
+.lamp { display: inline-flex; align-items: center; margin-right: 4px; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--lamp) 70%, transparent)); }
 .lamp[hidden] { display: none; }
 .lamp-flame { fill: var(--lamp); transform-origin: 16px 12px; }
 .lamp-bowl, .lamp-base { fill: #c4a060; }
