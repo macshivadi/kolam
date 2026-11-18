@@ -7,9 +7,7 @@ import { kolamSvg, strokeEndTime } from "./render";
 import { THEMES, type ThemeId } from "./themes";
 import { festivalOn } from "./festivals";
 import {
-  isStyleId,
   selectPendingGrid,
-  selectPendingStyle,
   styleFestivalId,
   styleForFestival,
   styleUsesColor,
@@ -20,16 +18,7 @@ import { applyAmbience, currentAmbience, lampVisible } from "./ambience";
 import { playDrawAlongSound, setSoundEnabled, soundEnabled } from "./sound";
 import { defaultColorMode, rangoliPalette } from "./palettes";
 import { colorRegions, type FillRegion } from "./regions";
-import {
-  advanceTrace,
-  buildSampledPath,
-  createTraceState,
-  isTraceComplete,
-  pointAtLength,
-  traceProgress01,
-  type SampledPath,
-  type TraceState,
-} from "./trace";
+import { buildSampledPath, pointAtLength, type SampledPath } from "./trace";
 import "./style.css";
 import {
   KOLAM_WHATSAPP_URL,
@@ -41,7 +30,7 @@ import {
 } from "./share";
 
 type Mode = "daily" | "generated";
-type DrawMode = "view" | "watch" | "trace";
+type DrawMode = "view" | "watch";
 
 type State = {
   mode: Mode;
@@ -156,17 +145,12 @@ function formatHeroLine(dateStr: string, num: number, label: string): string {
 }
 
 function applyTheme(themeId: ThemeId): void {
-  const theme = THEMES[themeId];
   const root = document.documentElement;
   root.dataset.theme = themeId;
-  root.style.setProperty("--line", theme.line);
-  root.style.setProperty("--dot", theme.dot);
-  root.style.setProperty("--ink", theme.ink);
-  root.style.setProperty("--muted", theme.muted);
-  root.style.setProperty("--accent", theme.accent);
-  root.style.setProperty("--button-face", theme.buttonFace);
-  root.style.setProperty("--button-text", theme.buttonText);
-  root.style.setProperty("--mark", theme.mark);
+  // Page ink / accent stay on the light paper palette. The kolam tile
+  // reads THEMES[themeId] directly when the SVG is drawn.
+  const paper = getComputedStyle(root).getPropertyValue("--paper").trim();
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", paper || "#f5eadc");
 }
 
 function seededColor(state: State): boolean {
@@ -178,11 +162,6 @@ function themeForStyle(style: KolamStyleId): ThemeId {
   if (style === "harvest" || style === "onam") return "pongal";
   if (style === "christmas") return "christmas";
   return "classic";
-}
-
-function resolvedStyle(style: KolamStyleId, seedOrNumber: number): KolamStyleId {
-  if (style !== "auto") return style;
-  return defaultColorMode(seedOrNumber) ? "color" : "line";
 }
 
 function readColorPref(): boolean | null {
@@ -226,7 +205,12 @@ function markDrawn(svg: Element): void {
 function renderStage(state: State, opts: { slow?: boolean; static?: boolean } = {}): void {
   stopWatch();
   const stage = $("stage");
-  const theme = THEMES[state.themeId];
+  const theme = { ...THEMES[state.themeId] };
+  const amb = currentAmbience();
+  const goldRings = amb === "dusk" || amb === "night";
+  if (goldRings && state.themeId === "classic") {
+    theme.floor = amb === "dusk" ? "#12100e" : "#0e0c0b";
+  }
   const slow = Boolean(opts.slow);
   const asStatic = Boolean(opts.static);
   stage.innerHTML = kolamSvg(state.pattern, {
@@ -235,8 +219,9 @@ function renderStage(state: State, opts: { slow?: boolean; static?: boolean } = 
     static: asStatic,
     fills: fillsFor(state),
     style: state.styleId,
+    goldRings,
   });
-  stage.classList.toggle("is-tracing", state.drawMode === "trace");
+  stage.classList.remove("is-tracing");
   stage.classList.remove("is-complete");
   const svg = stage.querySelector("svg");
   if (!svg) return;
@@ -296,9 +281,6 @@ function renderChrome(state: State): void {
 
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.grid === state.pendingGridId));
-  });
-  document.querySelectorAll<HTMLButtonElement>("[data-style]").forEach((btn) => {
-    btn.setAttribute("aria-pressed", String(btn.dataset.style === state.pendingStyleId));
   });
   $("color-white").setAttribute("aria-pressed", String(!state.color));
   $("color-on").setAttribute("aria-pressed", String(state.color));
@@ -444,8 +426,6 @@ type WatchRun = {
   fingertip: SVGCircleElement | null;
 };
 let watchRun: WatchRun | null = null;
-let traceState: TraceState | null = null;
-let tracing = false;
 
 function stopWatch(): void {
   if (watchRun?.raf) cancelAnimationFrame(watchRun.raf);
@@ -563,140 +543,16 @@ function toggleWatchPause(state: State): void {
   watchRun.raf = requestAnimationFrame((now) => tickWatch(state, now));
 }
 
-function showDrawPanel(mode: "watch" | "trace"): void {
-  const panel = $("draw-along");
-  panel.hidden = false;
-  $("watch-tab").setAttribute("aria-pressed", String(mode === "watch"));
-  $("trace-tab").setAttribute("aria-pressed", String(mode === "trace"));
-  $("watch-controls").hidden = mode !== "watch";
-  $("trace-controls").hidden = mode !== "trace";
+function showDrawPanel(): void {
+  $("draw-along").hidden = false;
 }
 
 function exitDrawAlong(state: State, opts: { silent?: boolean } = {}): void {
   stopWatch();
-  traceState = null;
-  tracing = false;
   state.drawMode = "view";
   $("draw-along").hidden = true;
-  $("stage").classList.remove("is-tracing", "is-complete");
-  if (!opts.silent) renderStage(state, { static: true });
-}
-
-function startTrace(state: State): void {
-  stopWatch();
-  state.drawMode = "trace";
-  showDrawPanel("trace");
-  renderStage(state, { static: true });
-  const svg = $("stage").querySelector("svg");
-  if (!svg) return;
-  $("stage").classList.add("is-tracing");
   $("stage").classList.remove("is-complete");
-  svg.querySelectorAll<SVGPathElement>(".kolam-path").forEach((p) => {
-    p.style.animation = "none";
-    p.style.strokeDasharray = "1";
-    p.style.strokeDashoffset = "1";
-    p.style.opacity = "0.28";
-    p.classList.remove("is-drawn");
-  });
-  const fills = svg.querySelector(".kolam-fills");
-  if (fills) fills.classList.remove("is-colored");
-  // Overlay copies that light up as the user traces.
-  const ns = "http://www.w3.org/2000/svg";
-  const lines = svg.querySelector(".kolam-lines") ?? svg;
-  state.pattern.paths.forEach((d, i) => {
-    const p = document.createElementNS(ns, "path");
-    p.setAttribute("class", `trace-ink trace-ink-${i}`);
-    p.setAttribute("d", d);
-    p.setAttribute("fill", "none");
-    p.setAttribute("stroke", THEMES[state.themeId].line);
-    p.setAttribute("stroke-width", "0.16");
-    p.setAttribute("stroke-linecap", "round");
-    p.setAttribute("stroke-linejoin", "round");
-    p.setAttribute("pathLength", "1");
-    p.style.strokeDasharray = "1";
-    p.style.strokeDashoffset = "1";
-    lines.appendChild(p);
-  });
-  const tip = ensureFingertip(svg as SVGSVGElement);
-  const first = buildSampledPath(state.pattern.paths[0] ?? "M0 0Z");
-  const start = pointAtLength(first, 0);
-  tip.setAttribute("cx", String(start.x));
-  tip.setAttribute("cy", String(start.y));
-  tip.style.display = "";
-  traceState = createTraceState(state.pattern.paths);
-  $("trace-progress").textContent = "0%";
-}
-
-function paintTrace(): void {
-  if (!traceState) return;
-  const svg = $("stage").querySelector("svg");
-  if (!svg) return;
-  const inks = svg.querySelectorAll<SVGPathElement>(".trace-ink");
-  inks.forEach((p, i) => {
-    if (i < traceState!.loopIndex) {
-      p.style.strokeDashoffset = "0";
-    } else if (i === traceState!.loopIndex) {
-      const path = traceState!.paths[i];
-      const t = path && path.length ? traceState!.progress / path.length : 0;
-      p.style.strokeDashoffset = String(1 - t);
-    } else {
-      p.style.strokeDashoffset = "1";
-    }
-  });
-  const tip = svg.querySelector<SVGCircleElement>(".fingertip");
-  if (tip && !isTraceComplete(traceState) && traceState.paths[traceState.loopIndex]) {
-    const path = traceState.paths[traceState.loopIndex];
-    const pt = pointAtLength(path, traceState.progress);
-    tip.setAttribute("cx", String(pt.x));
-    tip.setAttribute("cy", String(pt.y));
-    tip.style.display = "";
-  }
-  const pct = Math.round(traceProgress01(traceState) * 100);
-  $("trace-progress").textContent = `${pct}%`;
-  if (isTraceComplete(traceState)) {
-    $("stage").classList.add("is-complete");
-    if (tip) tip.style.display = "none";
-    const fills = svg.querySelector(".kolam-fills");
-    if (fills && fills.childElementCount > 0) fills.classList.add("is-colored");
-    playDrawAlongSound();
-  }
-}
-
-function pointerToSvg(ev: PointerEvent): { x: number; y: number } | null {
-  const svg = $("stage").querySelector("svg");
-  if (!svg) return null;
-  const pt = svg.createSVGPoint();
-  pt.x = ev.clientX;
-  pt.y = ev.clientY;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return null;
-  const p = pt.matrixTransform(ctm.inverse());
-  return { x: p.x, y: p.y };
-}
-
-function onStagePointerDown(state: State, ev: PointerEvent): void {
-  if (state.drawMode !== "trace") return;
-  ev.preventDefault();
-  tracing = true;
-  (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);
-  const pt = pointerToSvg(ev);
-  if (pt && traceState) {
-    traceState = advanceTrace(traceState, pt);
-    paintTrace();
-  }
-}
-
-function onStagePointerMove(state: State, ev: PointerEvent): void {
-  if (state.drawMode !== "trace" || !tracing || !traceState) return;
-  ev.preventDefault();
-  const pt = pointerToSvg(ev);
-  if (!pt) return;
-  traceState = advanceTrace(traceState, pt);
-  paintTrace();
-}
-
-function onStagePointerUp(): void {
-  tracing = false;
+  if (!opts.silent) renderStage(state, { static: true });
 }
 
 function freshSeed(): number {
@@ -726,18 +582,11 @@ function wire(state: State): void {
 
   $("replay").addEventListener("click", () => {
     state.drawMode = "watch";
-    showDrawPanel("watch");
+    showDrawPanel();
     $("speed-slow").setAttribute("aria-pressed", String(state.watchSpeed === "slow"));
     $("speed-normal").setAttribute("aria-pressed", String(state.watchSpeed === "normal"));
     startWatch(state, true);
   });
-  $("watch-tab").addEventListener("click", () => {
-    state.drawMode = "watch";
-    showDrawPanel("watch");
-    $("stage").classList.remove("is-tracing");
-    startWatch(state, true);
-  });
-  $("trace-tab").addEventListener("click", () => startTrace(state));
   $("draw-close").addEventListener("click", () => exitDrawAlong(state));
   $("watch-pause").addEventListener("click", () => toggleWatchPause(state));
   $("speed-slow").addEventListener("click", () => {
@@ -752,22 +601,12 @@ function wire(state: State): void {
     $("speed-normal").setAttribute("aria-pressed", "true");
     if (state.drawMode === "watch") startWatch(state, true);
   });
-  $("trace-reset").addEventListener("click", () => startTrace(state));
-
-  const stage = $("stage");
-  stage.addEventListener("pointerdown", (ev) => onStagePointerDown(state, ev));
-  stage.addEventListener("pointermove", (ev) => onStagePointerMove(state, ev));
-  stage.addEventListener("pointerup", onStagePointerUp);
-  stage.addEventListener("pointercancel", onStagePointerUp);
-  stage.addEventListener("click", (ev) => {
-    // Canvas taps do nothing except in Trace mode (handled by pointer events).
-    if (state.drawMode !== "trace") ev.preventDefault();
-  });
+  $("stage").addEventListener("click", (ev) => ev.preventDefault());
 
   $("generate").addEventListener("click", () => {
     const seed = freshSeed();
     const gridId = state.pendingGridId;
-    const styleId = resolvedStyle(state.pendingStyleId, seed);
+    const styleId: KolamStyleId = state.color ? "color" : "line";
     const pattern = generateKolam(GRIDS[gridId], seed);
     state.colorOverridden = false;
     setPattern(state, {
@@ -800,7 +639,6 @@ function wire(state: State): void {
     renderStage(state, { static: state.drawMode !== "view" });
     renderChrome(state);
     if (state.drawMode === "watch") startWatch(state, true);
-    if (state.drawMode === "trace") startTrace(state);
   });
   $("color-on").addEventListener("click", () => {
     state.color = true;
@@ -809,7 +647,6 @@ function wire(state: State): void {
     renderStage(state, { static: state.drawMode !== "view" });
     renderChrome(state);
     if (state.drawMode === "watch") startWatch(state, true);
-    if (state.drawMode === "trace") startTrace(state);
   });
 
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
@@ -818,14 +655,6 @@ function wire(state: State): void {
       if (!GRID_IDS.includes(id)) return;
       // Select only — today's kolam and the canvas stay put until Generate.
       Object.assign(state, selectPendingGrid(state, id));
-      renderChrome(state);
-    });
-  });
-  document.querySelectorAll<HTMLButtonElement>("[data-style]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.style;
-      if (!isStyleId(id)) return;
-      Object.assign(state, selectPendingStyle(state, id));
       renderChrome(state);
     });
   });

@@ -8,9 +8,17 @@ function g(inner: string, x: number, y: number, s: number, rot = 0): string {
 }
 
 const LAMP = `<g class="motif-lamp">
-  <ellipse cx="0" cy="-0.42" rx="0.13" ry="0.22" fill="#ffd278"/>
-  <path d="M-0.3 0 C-0.3 -0.2 0.3 -0.2 0.3 0 L0.22 0.3 C0.14 0.52 -0.14 0.52 -0.22 0.3 Z" fill="#c4a060"/>
-  <rect x="-0.12" y="0.5" width="0.24" height="0.07" rx="0.03" fill="#a9843a"/>
+  <ellipse class="lamp-glow" cx="0" cy="-0.55" rx="0.55" ry="0.7" fill="#ffd278" opacity="0.28"/>
+  <ellipse cx="0" cy="-0.55" rx="0.16" ry="0.3" fill="#ffe9a0"/>
+  <ellipse cx="0" cy="-0.62" rx="0.07" ry="0.14" fill="#fff6d2"/>
+  <path d="M-0.38 0.02 C-0.38 -0.28 0.38 -0.28 0.38 0.02 L0.26 0.42 C0.16 0.68 -0.16 0.68 -0.26 0.42 Z" fill="#c4a060"/>
+  <path d="M-0.28 0.02 C-0.2 -0.14 0.2 -0.14 0.28 0.02" fill="none" stroke="#e8c547" stroke-width="0.05"/>
+  <rect x="-0.16" y="0.64" width="0.32" height="0.1" rx="0.04" fill="#a9843a"/>
+</g>`;
+
+/** Corner horn / suli, drawn in grid units, pointing outward from a corner. */
+const HORN = `<g class="motif-horn" fill="none" stroke="#f3e6c0" stroke-width="0.08" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M0 0 C0.15 -0.35 0.55 -0.55 0.85 -0.35 C1.05 -0.2 0.95 0.1 0.7 0.12 C0.5 0.14 0.42 -0.05 0.55 -0.12"/>
 </g>`;
 
 const STAR = `<path class="motif-star" fill="#f4d03f" d="M0,-0.55 L0.14,-0.14 L0.55,-0.1 L0.22,0.16 L0.34,0.55 L0,0.32 L-0.34,0.55 L-0.22,0.16 L-0.55,-0.1 L-0.14,-0.14 Z"/>`;
@@ -55,19 +63,55 @@ const KALASH = `<g class="motif-kalash">
   <path d="M0 -0.4 C0.2 -0.7 0.35 -0.5 0.12 -0.3" fill="none" stroke="#2d6a4f" stroke-width="0.05" stroke-linecap="round"/>
 </g>`;
 
-function lampsAround(W: number, count: 4 | 8, scale: number): string {
+function tipPoints(W: number, paths: string[] | undefined, count: 4 | 8): Array<{ x: number; y: number; deg: number }> {
   const c = W / 2;
-  const r = c + 0.55;
-  const parts: string[] = [];
-  const n = count;
-  for (let i = 0; i < n; i++) {
-    const a = (Math.PI * 2 * i) / n - Math.PI / 2;
-    const x = c + r * Math.cos(a);
-    const y = c + r * Math.sin(a);
-    const deg = (a * 180) / Math.PI + 90;
-    parts.push(g(LAMP, x, y, scale, deg));
+  const tips: Array<{ x: number; y: number; deg: number }> = [];
+  for (let i = 0; i < count; i++) {
+    const a = (Math.PI * 2 * i) / count - Math.PI / 2;
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    let best = 0;
+    let bx = c + (c + 0.15) * ux;
+    let by = c + (c + 0.15) * uy;
+    if (paths) {
+      for (const d of paths) {
+        // cheap parse of path numbers as x,y pairs starting after M
+        const nums = d.match(/-?\d+\.?\d*/g)?.map(Number) ?? [];
+        for (let k = 0; k + 1 < nums.length; k += 2) {
+          const x = nums[k];
+          const y = nums[k + 1];
+          const proj = (x - c) * ux + (y - c) * uy;
+          if (proj > best) {
+            best = proj;
+            bx = x;
+            by = y;
+          }
+        }
+      }
+    }
+    const reach = Math.hypot(bx - c, by - c) || c;
+    const x = c + (reach + 0.72) * ux;
+    const y = c + (reach + 0.72) * uy;
+    tips.push({ x, y, deg: (a * 180) / Math.PI + 90 });
   }
-  return parts.join("");
+  return tips;
+}
+
+function lampsAround(W: number, count: 4 | 8, scale: number, paths?: string[]): string {
+  return tipPoints(W, paths, count)
+    .map((t) => g(LAMP, t.x, t.y, scale, t.deg))
+    .join("");
+}
+
+function cornerHorns(W: number): string {
+  const inset = -0.15;
+  const corners = [
+    { x: inset, y: inset, rot: 0 },
+    { x: W - inset, y: inset, rot: 90 },
+    { x: W - inset, y: W - inset, rot: 180 },
+    { x: inset, y: W - inset, rot: 270 },
+  ];
+  return corners.map((p) => g(HORN, p.x, p.y, 1, p.rot)).join("");
 }
 
 function starsAround(W: number): string {
@@ -101,14 +145,14 @@ function flowerRings(W: number): string {
  * Festival motifs placed in the padding around (and sometimes at the center of)
  * the kolam, always in a 4- or 8-fold arrangement.
  */
-export function motifSvg(style: KolamStyleId, W: number): string {
+export function motifSvg(style: KolamStyleId, W: number, paths?: string[]): string {
   const c = W / 2;
-  const edge = 0.38 + W * 0.01;
+  const lampScale = 0.95;
   switch (style) {
     case "diwali":
-      return `<g class="motifs motifs-diwali">${lampsAround(W, 8, edge)}</g>`;
+      return `<g class="motifs motifs-diwali">${lampsAround(W, 8, lampScale, paths)}${cornerHorns(W)}</g>`;
     case "karthigai":
-      return `<g class="motifs motifs-karthigai">${lampsAround(W, 8, edge)}${g(LAMP, c, c, edge * 0.85)}</g>`;
+      return `<g class="motifs motifs-karthigai">${lampsAround(W, 8, lampScale, paths)}${g(LAMP, c, c, 0.8)}${cornerHorns(W)}</g>`;
     case "harvest":
       return `<g class="motifs motifs-harvest">${g(SUN, c, c, 0.85)}${g(POT, c, W + 0.55, 0.42)}${g(CANE, -0.15, c, 0.42, -12)}${g(CANE, W + 0.15, c, 0.42, 12)}${g(CANE, c, -0.15, 0.42, 90)}${g(POT, c, -0.55, 0.28)}${g(POT, -0.5, c, 0.28)}${g(POT, W + 0.5, c, 0.28)}</g>`;
     case "christmas":

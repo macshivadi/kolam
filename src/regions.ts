@@ -1,4 +1,5 @@
 import { sampleSvgPath } from "./pathGeom";
+import { d4Point } from "./canonical";
 import type { KolamPattern } from "./generator";
 
 export type FillRegion = {
@@ -10,7 +11,9 @@ export type FillRegion = {
   area: number;
 };
 
-const SCALE = 28;
+/** Must stay in step with the outline width in render.ts. */
+export const FILL_STROKE = 0.08;
+const SCALE = 40;
 
 function stampDisc(pix: Uint8Array, w: number, h: number, px: number, py: number, r: number): void {
   const x0 = Math.max(0, Math.floor(px - r));
@@ -37,13 +40,14 @@ function rasterizeStrokes(paths: string[], padding: number, W: number, scale: nu
   const w = Math.max(8, Math.ceil((W + padding * 2) * scale));
   const h = w;
   const pix = new Uint8Array(w * h);
-  const radius = Math.max(1.6, 0.08 * scale);
-  const maxGap = 0.45;
+  // Slightly thicker than half the outline so fills sit inside the stroke.
+  const radius = Math.max(1.4, (FILL_STROKE / 2 + 0.012) * scale);
+  const maxGap = 0.4;
 
   const toPx = (x: number, y: number): [number, number] => [(x + padding) * scale, (y + padding) * scale];
 
   for (const d of paths) {
-    const pts = sampleSvgPath(d, 20);
+    const pts = sampleSvgPath(d, 24);
     for (let i = 1; i < pts.length; i++) {
       const [x0, y0] = toPx(pts[i - 1].x, pts[i - 1].y);
       const [x1, y1] = toPx(pts[i].x, pts[i].y);
@@ -58,13 +62,21 @@ function rasterizeStrokes(paths: string[], padding: number, W: number, scale: nu
   return { pix, w, h, scale, padding };
 }
 
-function flood(pix: Uint8Array, w: number, h: number, sx: number, sy: number, id: number): { area: number; sx: number; sy: number; touchesEdge: boolean } {
+function flood(
+  pix: Uint8Array,
+  labels: Uint32Array,
+  w: number,
+  h: number,
+  sx: number,
+  sy: number,
+  id: number,
+): { area: number; sx: number; sy: number; touchesEdge: boolean } {
   const stack = [sy * w + sx];
   let area = 0;
   let sumX = 0;
   let sumY = 0;
   let touchesEdge = false;
-  pix[sy * w + sx] = id;
+  labels[sy * w + sx] = id;
   while (stack.length) {
     const i = stack.pop()!;
     const x = i % w;
@@ -76,12 +88,11 @@ function flood(pix: Uint8Array, w: number, h: number, sx: number, sy: number, id
     const nbs = [i - 1, i + 1, i - w, i + w];
     for (const n of nbs) {
       if (n < 0 || n >= pix.length) continue;
-      if (pix[n] !== 0) continue;
+      if (pix[n] !== 0 || labels[n] !== 0) continue;
       const nx = n % w;
       const ny = (n / w) | 0;
-      // prevent wrap on left/right
       if (Math.abs(nx - x) + Math.abs(ny - y) !== 1) continue;
-      pix[n] = id;
+      labels[n] = id;
       stack.push(n);
     }
   }
@@ -92,19 +103,21 @@ type RawRegion = { id: number; area: number; cx: number; cy: number };
 
 function extractRegions(
   pix: Uint8Array,
+  labels: Uint32Array,
   w: number,
   h: number,
   scale: number,
   padding: number,
 ): RawRegion[] {
-  let nextId = 2;
+  let nextId = 1;
   const raw: RawRegion[] = [];
-  const minArea = Math.max(10, (0.12 * scale) * (0.12 * scale));
+  const minArea = Math.max(8, 0.1 * scale * 0.1 * scale);
   for (let i = 0; i < pix.length; i++) {
-    if (pix[i] !== 0) continue;
+    if (pix[i] !== 0 || labels[i] !== 0) continue;
     const x = i % w;
     const y = (i / w) | 0;
-    const info = flood(pix, w, h, x, y, nextId);
+    nextId += 1;
+    const info = flood(pix, labels, w, h, x, y, nextId);
     if (!info.touchesEdge && info.area >= minArea) {
       raw.push({
         id: nextId,
@@ -113,24 +126,41 @@ function extractRegions(
         cy: info.sy / scale - padding,
       });
     }
-    nextId += 1;
-    if (nextId >= 254) break;
   }
   return raw;
 }
 
-/** Moore-neighbor contour in pixel space, then converted to grid units. */
+function chaikin(pts: Array<[number, number]>, rounds = 2): Array<[number, number]> {
+  let cur = pts;
+  for (let r = 0; r < rounds; r++) {
+    const next: Array<[number, number]> = [];
+    const n = cur.length;
+    if (n < 4) return cur;
+    for (let i = 0; i < n; i++) {
+      const a = cur[i];
+      const b = cur[(i + 1) % n];
+      next.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]]);
+      next.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]]);
+    }
+    cur = next;
+  }
+  return cur;
+}
+
+/** Moore-neighbor contour, lightly smoothed, in grid units. */
 function regionPath(
-  pix: Uint8Array,
+  labels: Uint32Array,
   w: number,
   h: number,
   id: number,
   scale: number,
   padding: number,
+  cx: number,
+  cy: number,
 ): string | null {
   let start = -1;
-  for (let i = 0; i < pix.length; i++) {
-    if (pix[i] === id) {
+  for (let i = 0; i < labels.length; i++) {
+    if (labels[i] === id) {
       start = i;
       break;
     }
@@ -139,7 +169,6 @@ function regionPath(
   const sx = start % w;
   const sy = (start / w) | 0;
 
-  // 8-neighborhood clockwise starting east
   const DX = [1, 1, 0, -1, -1, -1, 0, 1];
   const DY = [0, 1, 1, 1, 0, -1, -1, -1];
 
@@ -153,14 +182,13 @@ function regionPath(
 
   do {
     pts.push([x, y]);
-    // start searching from dir-2 (come from left of current heading)
     let found = -1;
     for (let k = 0; k < 8; k++) {
-      const nd = (dir + 6 + k) % 8; // turn left first
+      const nd = (dir + 6 + k) % 8;
       const nx = x + DX[nd];
       const ny = y + DY[nd];
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      if (pix[ny * w + nx] === id) {
+      if (labels[ny * w + nx] === id) {
         found = nd;
         break;
       }
@@ -174,49 +202,130 @@ function regionPath(
 
   if (pts.length < 3) return null;
 
-  // Downsample lightly
+  const step = Math.max(1, Math.floor(pts.length / 360));
   const simp: Array<[number, number]> = [];
-  const step = Math.max(1, Math.floor(pts.length / 180));
   for (let i = 0; i < pts.length; i += step) simp.push(pts[i]);
-  if (simp.length < 3) return null;
+  if (simp.length >= 3 && (simp[0][0] !== simp[simp.length - 1][0] || simp[0][1] !== simp[simp.length - 1][1])) {
+    simp.push(simp[0]);
+  }
+  const smooth = chaikin(simp, 2);
 
-  const toG = (px: number, py: number) => {
-    const gx = Math.round((px / scale - padding) * 100) / 100;
-    const gy = Math.round((py / scale - padding) * 100) / 100;
-    return `${gx} ${gy}`;
-  };
-  const parts = [`M${toG(simp[0][0], simp[0][1])}`];
-  for (let i = 1; i < simp.length; i++) parts.push(`L${toG(simp[i][0], simp[i][1])}`);
+  const inset = 0.012 * scale;
+  const insetPts = smooth.map(([px, py]) => {
+    const gx = px / scale - padding;
+    const gy = py / scale - padding;
+    const dx = cx - gx;
+    const dy = cy - gy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-4) return [gx, gy] as [number, number];
+    const m = Math.min(inset / scale, len * 0.15);
+    return [gx + (dx / len) * m, gy + (dy / len) * m] as [number, number];
+  });
+
+  const f = (n: number) => (Math.round(n * 100) / 100).toString();
+  const parts = [`M${f(insetPts[0][0])} ${f(insetPts[0][1])}`];
+  for (let i = 1; i < insetPts.length; i++) parts.push(`L${f(insetPts[i][0])} ${f(insetPts[i][1])}`);
   parts.push("Z");
   return parts.join(" ");
 }
 
+function q(n: number): number {
+  return Math.round(n * 4) / 4;
+}
+
+/** Canonical D4 orbit key for a point (lexicographically smallest image). */
+export function orbitKey(x: number, y: number, c: number): string {
+  const keys: string[] = [];
+  for (let t = 0; t < 8; t++) {
+    const [px, py] = d4Point(x, y, t, c);
+    keys.push(`${q(px)},${q(py)}`);
+  }
+  keys.sort();
+  return keys[0];
+}
+
+function mapPath(d: string, t: number, c: number): string {
+  const re = /([MLCZ])([^MLCZ]*)/gi;
+  let out = "";
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(d))) {
+    const cmd = m[1].toUpperCase();
+    if (cmd === "Z") {
+      out += "Z";
+      continue;
+    }
+    const nums = m[2]
+      .trim()
+      .split(/[ ,]+/)
+      .filter((s) => s.length)
+      .map(Number);
+    const mapped: string[] = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      const [x, y] = d4Point(nums[i], nums[i + 1], t, c);
+      mapped.push(String(Math.round(x * 100) / 100), String(Math.round(y * 100) / 100));
+    }
+    out += cmd + mapped.join(" ");
+  }
+  return out;
+}
+
+function ringOf(x: number, y: number, c: number): number {
+  return Math.round(Math.hypot(x - c, y - c) * 2) / 2;
+}
+
 /**
  * Extract filled faces between the sikku curves and assign rangoli colors
- * by D4-invariant ring (distance from the grid center) so all 8 copies match.
+ * by D4 orbit so every rotate/reflect of a cell shares one color. Paths are
+ * taken from one representative and copied around the orbit so the fills
+ * stay registered under the outline.
  */
 export function colorRegions(pattern: KolamPattern, palette: readonly string[]): FillRegion[] {
   if (pattern.paths.length === 0 || palette.length === 0) return [];
   const padding = 1.15;
   const { pix, w, h, scale } = rasterizeStrokes(pattern.paths, padding, pattern.grid.W, SCALE);
-  const raw = extractRegions(pix, w, h, scale, padding);
+  const labels = new Uint32Array(pix.length);
+  const raw = extractRegions(pix, labels, w, h, scale, padding);
   if (raw.length === 0) return [];
 
   const c = pattern.grid.c;
-  const rings = [...new Set(raw.map((r) => Math.round(Math.hypot(r.cx - c, r.cy - c) * 2) / 2))].sort(
-    (a, b) => a - b,
-  );
+  type Member = RawRegion & { d: string };
+  const groups = new Map<string, Member[]>();
+  for (const r of raw) {
+    const d = regionPath(labels, w, h, r.id, scale, padding, r.cx, r.cy);
+    if (!d) continue;
+    const key = orbitKey(r.cx, r.cy, c);
+    const arr = groups.get(key) ?? [];
+    arr.push({ ...r, d });
+    groups.set(key, arr);
+  }
+
+  const orbits = [...groups.entries()].map(([key, members]) => {
+    members.sort((a, b) => a.area - b.area || a.cx - b.cx);
+    const mid = members[Math.floor(members.length / 2)];
+    const [kx, ky] = key.split(",").map(Number);
+    const ringVal = Number.isFinite(kx) ? ringOf(kx, ky, c) : ringOf(mid.cx, mid.cy, c);
+    return { key, members, mid, ring: ringVal };
+  });
+  orbits.sort((a, b) => a.ring - b.ring || a.key.localeCompare(b.key));
+
+  const rings = [...new Set(orbits.map((o) => o.ring))].sort((a, b) => a - b);
   const ringIndex = new Map(rings.map((r, i) => [r, i]));
 
   const out: FillRegion[] = [];
-  for (const r of raw) {
-    const d = regionPath(pix, w, h, r.id, scale, padding);
-    if (!d) continue;
-    const ring = Math.round(Math.hypot(r.cx - c, r.cy - c) * 2) / 2;
-    const idx = ringIndex.get(ring) ?? 0;
-    const areaBucket = r.area > 0.55 ? 1 : 0;
-    const fill = palette[(idx * 2 + areaBucket) % palette.length];
-    out.push({ d, fill, ring, cx: r.cx, cy: r.cy, area: r.area });
+  const seen = new Set<string>();
+  for (const orbit of orbits) {
+    const fill = palette[(ringIndex.get(orbit.ring) ?? 0) % palette.length];
+    const src = orbit.mid;
+    for (let t = 0; t < 8; t++) {
+      const [cx, cy] = d4Point(src.cx, src.cy, t, c);
+      const k = orbitKey(cx, cy, c);
+      if (k !== orbit.key) continue;
+      const cell = `${q(cx)},${q(cy)}`;
+      if (seen.has(cell)) continue;
+      seen.add(cell);
+      const d = t === 0 ? src.d : mapPath(src.d, t, c);
+      out.push({ d, fill, ring: orbit.ring, cx, cy, area: src.area });
+    }
   }
   return out;
 }

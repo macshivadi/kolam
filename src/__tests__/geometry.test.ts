@@ -124,5 +124,6 @@ describe("pulli labels", () => {
     expect(pulliLabel(GRIDS.d7)).toBe("7-1 pulli");
     expect(pulliLabel(GRIDS.d5)).toBe("5-1 pulli");
     expect(pulliLabel(GRIDS.d95)).toBe("9-5 pulli");
+    expect(pulliLabel(GRIDS.d158)).toBe("15-8 pulli");
   });
 });

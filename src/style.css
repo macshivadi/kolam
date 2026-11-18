@@ -30,20 +30,22 @@
 }
 
 :root {
-  --sky-top: #07070e;
-  --sky-mid: #12101c;
-  --sky-bot: #1a1420;
-  --floor: #0e0c0b;
-  --floor-glow: #1c1410;
-  --line: #f4efe6;
-  --dot: #f4efe6;
-  --ink: #f6f0e8;
-  --muted: #b5a89a;
-  --accent: #d4a85a;
-  --button-face: #f4efe6;
-  --button-text: #1a1410;
-  --mark: #f4efe6;
-  --lamp: #ffbe5c;
+  --paper: #f5eadc;
+  --sky-top: #f3c8b4;
+  --sky-mid: #f6d7b4;
+  --sky-bot: #f5eadc;
+  --floor: #1c1612;
+  --floor-glow: #3a2a1c;
+  --line: #f3efe6;
+  --dot: #f3efe6;
+  --ink: #2a1c12;
+  --muted: #7a624c;
+  --accent: #c45c14;
+  --button-face: #c45c14;
+  --button-text: #fff8f0;
+  --mark: #2a1c12;
+  --lamp: #e8a04a;
+  --shadow: 0 18px 40px rgba(42, 28, 18, 0.14);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font-ui: "Noto Serif", "Iowan Old Style", Palatino, Georgia, serif;
@@ -51,40 +53,29 @@
 }
 
 html[data-ambience="dawn"] {
-  --sky-top: #161238;
-  --sky-mid: #5c2a4a;
-  --sky-bot: #c47a4a;
-  --floor: #1a1410;
-  --floor-glow: #3d2418;
-  --ink: #f6f0e8;
-  --muted: #c9b6a4;
-  --accent: #e0a04a;
+  --paper: #f7ead8;
+  --sky-top: #f2b9a8;
+  --sky-mid: #f6d0a8;
+  --sky-bot: #f7ead8;
 }
 html[data-ambience="day"] {
-  --sky-top: #241e18;
-  --sky-mid: #3a2e24;
-  --sky-bot: #4a3a2c;
-  --floor: #1c1612;
-  --floor-glow: #2a221c;
-  --muted: #a39c92;
-  --accent: #c4a574;
+  --paper: #f5eadc;
+  --sky-top: #f4d4bc;
+  --sky-mid: #f5eadc;
+  --sky-bot: #f5eadc;
 }
 html[data-ambience="dusk"] {
-  --sky-top: #0c0e24;
-  --sky-mid: #2a1a40;
-  --sky-bot: #4a2036;
-  --floor: #12100e;
-  --floor-glow: #3a2410;
-  --accent: #ffbe5c;
+  --paper: #f0e4d6;
+  --sky-top: #d4c0dc;
+  --sky-mid: #edc8a6;
+  --sky-bot: #f0e4d6;
   --lamp: #ffbe5c;
 }
 html[data-ambience="night"] {
-  --sky-top: #07070e;
-  --sky-mid: #12101c;
-  --sky-bot: #1a1420;
-  --floor: #0e0c0b;
-  --floor-glow: #1c1410;
-  --accent: #d4a85a;
+  --paper: #ebe0d2;
+  --sky-top: #c8b4d0;
+  --sky-mid: #e0c4a8;
+  --sky-bot: #ebe0d2;
   --lamp: #e8b86a;
 }
 
@@ -95,7 +86,7 @@ html[data-ambience="night"] {
 html, body {
   margin: 0;
   min-height: 100%;
-  background: var(--floor);
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-ui);
   -webkit-text-size-adjust: 100%;
@@ -112,8 +103,9 @@ body {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(1200px 700px at 50% -10%, var(--floor-glow), transparent 55%),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-bot) 72%, var(--floor) 100%);
+    radial-gradient(1100px 520px at 50% -8%, var(--sky-top), transparent 58%),
+    radial-gradient(800px 360px at 100% 0%, var(--sky-mid), transparent 50%),
+    var(--paper);
 }
 
 .skip {
@@ -132,9 +124,9 @@ body {
 }
 
 .page {
-  width: min(640px, 100%);
+  width: min(680px, 100%);
   margin: 0 auto;
-  padding: calc(8px + var(--safe-top)) 16px calc(28px + var(--safe-bottom));
+  padding: calc(16px + var(--safe-top)) 24px calc(36px + var(--safe-bottom));
 }
 
 .site-header {
@@ -212,7 +204,7 @@ html[data-ambience="night"] .lamp-flame {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin: 4px 0;
+  margin: 10px 0 4px;
 }
 
 .hero-line {
@@ -225,12 +217,11 @@ html[data-ambience="night"] .lamp-flame {
 
 .festival-chip {
   display: inline-block;
-  margin: 0 0 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
   color: var(--accent);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
 }
 .festival-chip[hidden] { display: none; }
 
@@ -245,12 +236,12 @@ html[data-ambience="night"] .lamp-flame {
 .canvas-label[hidden], #back-today[hidden] { display: none; }
 
 .stage {
-  margin: 8px auto 12px;
-  width: min(100%, 94vw, 560px);
+  margin: 20px auto 24px;
+  width: min(100%, 86vw, 520px);
   aspect-ratio: 1;
-  border-radius: 16px;
+  border-radius: 22px;
   overflow: hidden;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow);
   background: var(--floor);
 }
 .stage svg,
@@ -294,7 +285,7 @@ html[data-ambience="night"] .lamp-flame {
 @keyframes fills-in { from { opacity: 0; } to { opacity: 1; } }
 
 .stage.is-complete {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 40px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: var(--shadow), 0 0 36px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .fingertip { fill: var(--accent); filter: drop-shadow(0 0 0.15px var(--accent)); }
@@ -360,11 +351,18 @@ html[data-ambience="night"] .lamp-flame {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
+.menu-label {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .color-toggle {
   display: inline-flex;
-  margin: 0 auto 12px;
+  margin: 0 0 16px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
   overflow: hidden;
 }
 .color-toggle button {
@@ -385,17 +383,17 @@ html[data-ambience="night"] .lamp-flame {
 .primary-actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin: 0 auto 8px;
+  max-width: 440px;
 }
 .primary-actions .btn { width: 100%; padding: 0 8px; font-size: 0.92rem; }
 
 .draw-along {
-  margin: 8px 0 16px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
-  background: color-mix(in srgb, var(--floor) 70%, #000);
+  margin: 4px 0 16px;
+  padding: 4px 0 0;
+  border: 0;
+  background: transparent;
 }
 .draw-tabs {
   display: flex;
@@ -419,10 +417,11 @@ html[data-ambience="night"] .lamp-flame {
 .trace-hint { margin: 0; width: 100%; color: var(--muted); font-size: 0.88rem; }
 
 .create-card {
-  margin: 28px 0 8px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
-  padding: 4px 14px 14px;
+  margin: 40px 0 8px;
+  border-radius: 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  padding: 8px 0 14px;
 }
 .create-card summary {
   min-height: 44px;
@@ -492,11 +491,11 @@ html[data-ambience="night"] .lamp-flame {
   width: min(100%, 480px);
   max-height: min(86dvh, 640px);
   overflow: auto;
-  background: var(--floor);
+  background: var(--paper);
   color: var(--ink);
   border-radius: 20px 20px 0 0;
   padding: 16px 16px calc(16px + var(--safe-bottom));
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 -12px 40px rgba(42, 28, 18, 0.16);
 }
 .sheet-head {
   display: flex;

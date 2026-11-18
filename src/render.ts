@@ -4,6 +4,8 @@ import type { FillRegion } from "./regions";
 import type { KolamStyleId } from "./styles";
 import { motifSvg } from "./motifs";
 
+export const STROKE_WIDTH = 0.08;
+
 export type SvgOptions = {
   theme: Theme;
   /** When true, skip animation attributes (for PNG export and print). */
@@ -15,6 +17,8 @@ export type SvgOptions = {
   fills?: FillRegion[];
   /** Festival / decorative motifs drawn with the kolam. */
   style?: KolamStyleId;
+  /** Gold ring around each pulli — dusk / night stone-floor look. */
+  goldRings?: boolean;
 };
 
 function bounds(pattern: KolamPattern, padding: number) {
@@ -54,7 +58,7 @@ function filterDefs(id: string, width: number, height: number, pad: number): str
     </filter>
     <filter id="flour-${id}" x="-${pad + 1}" y="-${pad + 1}" width="${width}" height="${height}" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="2" seed="4" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.03" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.045" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
   </defs>`;
 }
@@ -71,8 +75,8 @@ function fillGroup(fills: FillRegion[] | undefined): string {
 }
 
 export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
-  const motifs = opts.style ? motifSvg(opts.style, pattern.grid.W) : "";
-  const padding = opts.padding ?? (motifs ? 1.35 : 1.15);
+  const motifs = opts.style ? motifSvg(opts.style, pattern.grid.W, pattern.paths) : "";
+  const padding = opts.padding ?? (motifs ? 2.4 : 1.15);
   const theme = opts.theme;
   const vb = viewBoxFor(pattern, padding);
   const b = bounds(pattern, padding);
@@ -86,14 +90,19 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
       const delay = opts.static
         ? ""
         : ` style="animation-delay:${strokeDelay.toFixed(2)}s;animation-duration:${drawSecs.toFixed(2)}s"`;
-      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay} filter="url(#flour-${fid})"/>`;
+      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="${STROKE_WIDTH}" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay} filter="url(#flour-${fid})"/>`;
     })
     .join("\n");
   const dots = pattern.grid.dots
     .map((p) => {
       const delay = opts.static
-        ? ""
+        ? opts.goldRings
+          ? ` class="kolam-dot"`
+          : ""
         : ` class="kolam-dot" style="animation-delay:${((p.y - 1) * rowDelay).toFixed(2)}s"`;
+      if (opts.goldRings) {
+        return `    <g${delay}><circle class="kolam-dot-ring" cx="${p.x}" cy="${p.y}" r="0.13" fill="none" stroke="#e8c547" stroke-width="0.045"/><circle cx="${p.x}" cy="${p.y}" r="0.07" fill="${theme.dot}"/></g>`;
+      }
       return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="0.085" fill="${theme.dot}"/>`;
     })
     .join("\n");
@@ -121,7 +130,7 @@ export function ogShareSvg(
   style?: KolamStyleId,
   fills?: FillRegion[],
 ): string {
-  const padding = style ? 1.35 : 1.15;
+  const padding = style ? 2.4 : 1.15;
   const vb = viewBoxFor(pattern, padding);
   const inner = kolamSvg(pattern, { theme, static: true, padding, style, fills });
   const size = 560;

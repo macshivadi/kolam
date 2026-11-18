@@ -51,7 +51,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     label: "Diwali",
     floor: "#0c1026",
     floorGlow: "#1a2050",
-    line: "#e8c547",
+    line: "#f3e6c0",
     dot: "#ffd978",
     ink: "#f4efe4",
     muted: "#b8b3c9",

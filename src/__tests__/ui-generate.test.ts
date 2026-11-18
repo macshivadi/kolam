@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GRIDS, GRID_IDS, type GridId } from "../grid";
 import { generateKolam, kolamOfTheDay, type KolamPattern } from "../generator";
 import { LAUNCH_DATE } from "../dateSeed";
-import { selectPendingGrid, selectPendingStyle, type KolamStyleId } from "../styles";
+import { selectPendingGrid, type KolamStyleId } from "../styles";
 
 type UiState = {
   mode: "daily" | "generated";
@@ -14,7 +14,7 @@ type UiState = {
 };
 
 describe("Create your own chips", () => {
-  it("grid chips and style picker only select — they do not redraw today's kolam", () => {
+  it("grid chips only select — they do not redraw today's kolam", () => {
     const daily = kolamOfTheDay(LAUNCH_DATE);
     const state: UiState = {
       mode: "daily",
@@ -31,11 +31,8 @@ describe("Create your own chips", () => {
     expect(afterGrid.gridId).toBe(daily.spec.id);
     expect(afterGrid.pendingGridId).toBe("11x11");
 
-    const afterStyle = selectPendingStyle(afterGrid, "diwali");
-    expect(afterStyle.pattern).toBe(daily);
-    expect(afterStyle.styleId).toBe("line");
-    expect(afterStyle.pendingStyleId).toBe("diwali");
-    expect(afterStyle.mode).toBe("daily");
+    // Generate has not been tapped, so the canvas is still today's kolam.
+    expect(afterGrid.styleId).toBe("line");
   });
 
   it("Generate is what actually draws a new kolam for the pending grid", () => {

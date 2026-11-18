@@ -2,7 +2,7 @@ export type Point = { x: number; y: number };
 
 export type GridKind = "square" | "diamond";
 
-export type GridId = "5x5" | "7x7" | "9x9" | "11x11" | "d5" | "d7" | "d9" | "d95";
+export type GridId = "5x5" | "7x7" | "9x9" | "11x11" | "d5" | "d7" | "d9" | "d95" | "d158";
 
 export type GridSpec = {
   id: GridId;
@@ -23,9 +23,15 @@ export const GRIDS: Record<GridId, GridSpec> = {
   d7: { id: "d7", label: "7-1 pulli", kind: "diamond", rows: [1, 3, 5, 7, 5, 3, 1] },
   d9: { id: "d9", label: "9-1 pulli", kind: "diamond", rows: [1, 3, 5, 7, 9, 7, 5, 3, 1] },
   d95: { id: "d95", label: "9-5 pulli", kind: "diamond", rows: [5, 7, 9, 7, 5] },
+  d158: {
+    id: "d158",
+    label: "15-8 pulli",
+    kind: "diamond",
+    rows: [8, 9, 10, 11, 12, 13, 14, 15, 14, 13, 12, 11, 10, 9, 8],
+  },
 };
 
-export const GRID_IDS: GridId[] = ["5x5", "7x7", "9x9", "11x11", "d5", "d7", "d9", "d95"];
+export const GRID_IDS: GridId[] = ["5x5", "7x7", "9x9", "11x11", "d5", "d7", "d9", "d95", "d158"];
 
 /** Larger grids only, so ~10 years of days cannot exhaust the D4 pattern space. */
 export const DAILY_GRID_CYCLE: GridId[] = ["7x7", "9x9", "11x11", "d9"];
@@ -46,10 +52,11 @@ export function dotsForGrid(spec: GridSpec): Point[] {
   }
   const rows = spec.rows!;
   const max = Math.max(...rows);
+  const y0 = 1 + Math.floor((max - rows.length) / 2);
   const dots: Point[] = [];
   for (let i = 0; i < rows.length; i++) {
     const count = rows[i];
-    const y = i + 1;
+    const y = y0 + i;
     const start = 1 + Math.floor((max - count) / 2);
     for (let k = 0; k < count; k++) dots.push({ x: start + k, y });
   }

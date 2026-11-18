@@ -161,26 +161,180 @@ export function bitsFromSeed(seed: number, n: number): boolean[] {
   return bits;
 }
 
+export type RecipeId =
+  | "cross-knot"
+  | "center-chain"
+  | "rosette"
+  | "frame-petals"
+  | "lotus"
+  | "star-diag"
+  | "nested"
+  | "sparse-knots"
+  | "outer-ring"
+  | "diamond-petals";
+
+export const RECIPE_IDS: RecipeId[] = [
+  "cross-knot",
+  "center-chain",
+  "rosette",
+  "frame-petals",
+  "lotus",
+  "star-diag",
+  "nested",
+  "sparse-knots",
+  "outer-ring",
+  "diamond-petals",
+];
+
+export type RecipeOpts = {
+  /** Which interior radius band (0 = innermost) a ring recipe emphasizes. */
+  band?: number;
+  /** Leave the outer frame as crossings (open) instead of the recipe default. */
+  openFrame?: boolean;
+};
+
+export type TaggedOrbit = {
+  orbit: EdgeRef[];
+  kind: OrbitKind;
+  r: number;
+  axis: boolean;
+  diag: boolean;
+};
+
+export function tagOrbit(grid: MirrorGrid, orbit: EdgeRef[]): TaggedOrbit {
+  const kind = classifyOrbit(grid, orbit);
+  const r = orbitRadiusNorm(grid, orbit);
+  const c = grid.c;
+  let axisN = 0;
+  let diagN = 0;
+  for (const e of orbit) {
+    const m = edgeMid(e);
+    const dx = Math.abs(m.x - c);
+    const dy = Math.abs(m.y - c);
+    if (dx < 0.6 || dy < 0.6) axisN += 1;
+    if (Math.abs(dx - dy) < 0.8) diagN += 1;
+  }
+  return {
+    orbit,
+    kind,
+    r,
+    axis: axisN >= orbit.length / 2,
+    diag: diagN >= orbit.length / 2,
+  };
+}
+
+function bandKeys(tagged: TaggedOrbit[], kind: OrbitKind): number[] {
+  const keys = new Set<number>();
+  for (const t of tagged) {
+    if (t.kind === kind) keys.add(Math.round(t.r * 8));
+  }
+  return [...keys].sort((a, b) => a - b);
+}
+
 /**
- * Place a curated, D4-symmetric set of interior mirrors. A pretty default
- * (border petals, optional center, open interior crossings) is XOR-ed with
- * a unique bit mask from the seed, so each Generate tap and each day is a
- * different valid closed kolam — never the empty all-off lattice.
+ * Build a traditional D4 sikku skeleton: plus/cross with center circles and
+ * corner teardrops, axis teardrop chains, rosette rings, frame petals, or
+ * a lotus of inner rings. Variation happens later, on decorative interiors.
+ */
+export function applyRecipe(spec: GridSpec, recipe: RecipeId, opts: RecipeOpts = {}): MirrorGrid {
+  const grid = cloneMirrors(buildRegion(spec));
+  const tagged = listOrbits(grid).map((orbit) => tagOrbit(grid, orbit));
+  const bands = bandKeys(tagged, "interior");
+  const edgeBands = bandKeys(tagged, "edge");
+  // Default ring recipes to a mid / inner / outer band so they stay distinct.
+  const mid = bands.length ? bands[Math.floor(bands.length / 2)] : -1;
+  const focus = bands.length ? bands[Math.abs(opts.band ?? Math.floor(bands.length / 2)) % bands.length] : -1;
+  const inner = bands.length ? bands[0] : -1;
+  const outer = bands.length ? bands[bands.length - 1] : -1;
+  const edgeOuter = edgeBands.length ? edgeBands[edgeBands.length - 1] : -1;
+  const hasCorners = tagged.some((t) => t.kind === "corner");
+
+  for (const t of tagged) {
+    const band = Math.round(t.r * 8);
+    const isInner = t.kind === "interior" && band === inner;
+    const isOuter = t.kind === "interior" && band === outer;
+    const isMid = t.kind === "interior" && band === mid;
+    const isFocus = t.kind === "interior" && band === focus;
+    const isOutEdge = t.kind === "edge" && band === edgeOuter;
+    let on = false;
+    switch (recipe) {
+      case "cross-knot":
+        // Plus/cross: small center circles and corner teardrop knots.
+        on = t.kind === "center" || t.kind === "corner";
+        break;
+      case "center-chain":
+        on = t.kind === "center" || t.kind === "corner" || (t.kind === "interior" && t.axis);
+        break;
+      case "rosette":
+        on = t.kind === "center" || t.kind === "corner" || (opts.band !== undefined ? isFocus : isMid);
+        break;
+      case "frame-petals":
+        on = t.kind === "corner" || isOutEdge;
+        break;
+      case "lotus":
+        on = t.kind === "center" || t.kind === "corner" || isInner;
+        break;
+      case "star-diag":
+        on = t.kind === "center" || (t.kind === "interior" && t.diag);
+        break;
+      case "nested":
+        on =
+          t.kind === "center" ||
+          t.kind === "corner" ||
+          (t.kind === "interior" && band % 2 === (opts.band ?? 0) % 2);
+        break;
+      case "sparse-knots":
+        on = hasCorners ? t.kind === "corner" : t.kind === "center";
+        break;
+      case "outer-ring":
+        on = t.kind === "center" || t.kind === "corner" || isOuter;
+        break;
+      case "diamond-petals":
+        on = t.kind === "center" || t.kind === "corner" || isOutEdge;
+        break;
+    }
+    if (opts.openFrame && t.kind === "edge") on = false;
+    applyOrbit(grid, t.orbit, on);
+  }
+  return grid;
+}
+
+/**
+ * Traditional template plus a unique, limited variation on decorative
+ * (currently off) interior orbits. Never the empty all-off lattice.
+ * Coverage is repaired by polishD4; loop count is not minimized.
  */
 export function constructSymmetricKolam(spec: GridSpec, seed: number): MirrorGrid {
-  const grid = cloneMirrors(buildRegion(spec));
-  const orbits = listOrbits(grid);
-  const tagged = orbits.map((orbit) => ({
-    orbit,
-    kind: classifyOrbit(grid, orbit),
-  }));
-
-  for (const t of tagged) applyOrbit(grid, t.orbit, false);
-
-  const bits = bitsFromSeed(seed >>> 0, tagged.length);
-  for (let i = 0; i < tagged.length; i++) {
-    const pretty = tagged[i].kind !== "interior";
-    applyOrbit(grid, tagged[i].orbit, pretty !== bits[i]);
+  const s = seed >>> 0;
+  // Keep the recipe stable across nearby seeds so bit patterns stay unique.
+  const recipe = RECIPE_IDS[Math.floor(s / 257) % RECIPE_IDS.length];
+  const band = (s >>> 8) % 4;
+  const grid = applyRecipe(spec, recipe, { band });
+  const tagged = listOrbits(grid).map((orbit) => tagOrbit(grid, orbit));
+  const freeInt = tagged.filter((t) => t.kind === "interior" && !getEdge(grid, t.orbit[0]));
+  const edges = tagged
+    .filter((t) => t.kind === "edge" && !getEdge(grid, t.orbit[0]))
+    .sort((a, b) => b.r - a.r);
+  const need = 10;
+  const extra = freeInt.slice();
+  for (const e of edges) {
+    if (extra.length >= need) break;
+    extra.push(e);
+  }
+  // Small grids need more unique bits; XOR leftover orbits.
+  if (extra.length < 8) {
+    for (const t of tagged) {
+      if (extra.length >= 8) break;
+      if (!extra.includes(t)) extra.push(t);
+    }
+  }
+  if (extra.length > 0) {
+    const bits = bitsFromSeed(s, extra.length);
+    for (let i = 0; i < extra.length; i++) {
+      if (!bits[i]) continue;
+      const t = extra[i];
+      applyOrbit(grid, t.orbit, !getEdge(grid, t.orbit[0]));
+    }
   }
 
   let anyOn = false;
@@ -191,7 +345,7 @@ export function constructSymmetricKolam(spec: GridSpec, seed: number): MirrorGri
     }
   }
   if (!anyOn && tagged.length > 0) {
-    applyOrbit(grid, tagged[(seed >>> 0) % tagged.length].orbit, true);
+    applyOrbit(grid, tagged[s % tagged.length].orbit, true);
   }
 
   return polishD4(grid, seed);

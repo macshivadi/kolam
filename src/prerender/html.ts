@@ -129,7 +129,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(description)}"/>
   <link rel="canonical" href="${escapeHtml(canonical)}"/>
-  <meta name="theme-color" content="${theme.floor}"/>
+  <meta name="theme-color" content="#f5eadc"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="Kolam"/>
   <meta property="og:title" content="${escapeHtml(title)}"/>
@@ -168,7 +168,6 @@ export function buildDayPage(input: DayPageInput): DayPage {
       <span class="lamp" id="lamp" hidden aria-hidden="true"></span>
       <button type="button" id="menu-btn" class="icon-btn menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="menu-panel">☰</button>
     </header>
-    <p class="tagline">A new sikku kolam every day. Watch it, trace it, save it.</p>
     <section class="hero">
       <div class="hero-meta">
         ${showPrev ? `<a id="prev-day" class="icon-btn" rel="prev" href="${prevHref}" aria-label="Previous day">←</a>` : `<a id="prev-day" class="icon-btn" href="#" aria-label="Previous day" aria-disabled="true">←</a>`}
@@ -181,31 +180,19 @@ export function buildDayPage(input: DayPageInput): DayPage {
       <div id="stage" class="stage" role="img" aria-label="${escapeHtml(title)}">
         ${svg}
       </div>
-      <div class="color-toggle no-print" role="group" aria-label="Rice flour or rangoli color">
-        <button type="button" id="color-white">White</button>
-        <button type="button" id="color-on">Color</button>
-      </div>
       <div class="primary-actions no-print">
         <button type="button" id="replay" class="btn">Draw along</button>
         <button type="button" id="save-png" class="btn">Save</button>
         <button type="button" id="share" class="btn btn-primary">Share</button>
       </div>
       <div id="draw-along" class="draw-along no-print" hidden>
-        <div class="draw-tabs">
-          <button type="button" id="watch-tab" aria-pressed="true">Watch</button>
-          <button type="button" id="trace-tab">Trace</button>
-          <button type="button" id="draw-close" class="pill">Done</button>
-        </div>
         <div id="watch-controls">
           <button type="button" id="watch-pause" class="btn">Pause</button>
           <div class="speed" role="group" aria-label="Speed">
             <button type="button" id="speed-slow" data-speed="slow" aria-pressed="true">Slow</button>
             <button type="button" id="speed-normal" data-speed="normal">Normal</button>
           </div>
-        </div>
-        <div id="trace-controls" hidden>
-          <p id="trace-progress" class="trace-progress">0%</p>
-          <button type="button" id="trace-reset" class="btn">Start over</button>
+          <button type="button" id="draw-close" class="pill">Done</button>
         </div>
       </div>
     </section>
@@ -222,18 +209,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
         <button type="button" class="chip" data-grid="d7">7–1</button>
         <button type="button" class="chip" data-grid="d9">9–1</button>
         <button type="button" class="chip" data-grid="d95">9–5</button>
-      </fieldset>
-      <fieldset class="chip-row" id="style-picker">
-        <legend>Style</legend>
-        <button type="button" class="chip" data-style="auto">Auto</button>
-        <button type="button" class="chip" data-style="line">Line</button>
-        <button type="button" class="chip" data-style="color">Color</button>
-        <button type="button" class="chip" data-style="diwali">Diwali</button>
-        <button type="button" class="chip" data-style="harvest">Pongal · Sankranti</button>
-        <button type="button" class="chip" data-style="christmas">Christmas</button>
-        <button type="button" class="chip" data-style="onam">Onam</button>
-        <button type="button" class="chip" data-style="navaratri">Navaratri</button>
-        <button type="button" class="chip" data-style="karthigai">Karthigai</button>
+        <button type="button" class="chip" data-grid="d158">15–8</button>
       </fieldset>
       <button type="button" id="generate" class="btn btn-primary">Generate</button>
     </details>
@@ -245,6 +221,11 @@ export function buildDayPage(input: DayPageInput): DayPage {
     <div class="sheet-backdrop" data-close="menu"></div>
     <div class="sheet-card" role="dialog" aria-labelledby="menu-title">
       <div class="sheet-head"><h2 id="menu-title">Menu</h2><button type="button" class="icon-btn" data-close="menu" aria-label="Close menu">×</button></div>
+      <p class="menu-label">Rice flour or rangoli color</p>
+      <div class="color-toggle" role="group" aria-label="Rice flour or rangoli color">
+        <button type="button" id="color-white">White</button>
+        <button type="button" id="color-on">Color</button>
+      </div>
       <label class="toggle"><input type="checkbox" id="sound-toggle"/> <span>Sound on Draw along</span></label>
       <button type="button" id="about-btn" class="btn">About</button>
     </div>

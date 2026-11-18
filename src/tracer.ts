@@ -294,34 +294,55 @@ export function turnsAt(loop: Loop, i: number): boolean {
   return prev[0] !== cur[0] || prev[1] !== cur[1];
 }
 
+/** Isolated teardrop / petal: a short bounce-to-bounce hop in one square. */
+export function isTightPetal(loop: Loop, i: number): boolean {
+  const n = loop.mids.length;
+  if (n === 0) return false;
+  const a = loop.mids[i];
+  const b = loop.mids[(i + 1) % n];
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  return turnsAt(loop, i) && turnsAt(loop, (i + 1) % n) && dist < 1.05;
+}
+
 /**
  * SVG path in grid units, in the traditional sikku style:
- * straight 45° strokes through crossings (between pulli) and a quarter-circle
- * inside the unit square at a mirror bounce (lobes, petals, horns).
- * Drawing every step as a quarter-circle around a vertex was wrong: it filled
- * a circle around every dot regardless of the mirrors, so every pattern looked
- * the same.
+ * straight 45° strokes through crossings (merged into one line when
+ * several unit cells run together) and a cubic inside the unit square at
+ * a mirror bounce (lobes, petals, horns). Handle lengths grow for shallow
+ * turns so consecutive segments read as one long hand-drawn sweep, while
+ * isolated teardrops stay tight. Commands stay per-local-geometry so the
+ * rendered path is D4-symmetric regardless of where the loop is started.
  */
 export function loopToPath(loop: Loop): string {
   const mids = loop.mids;
   const n = mids.length;
   if (n === 0) return "";
   const parts = [`M${fmt(mids[0].x)} ${fmt(mids[0].y)}`];
-  for (let i = 0; i < n; i++) {
+  let i = 0;
+  while (i < n) {
+    const bouncedA = turnsAt(loop, i);
+    const bouncedB = turnsAt(loop, (i + 1) % n);
+    if (!bouncedA && !bouncedB) {
+      let j = i + 1;
+      while (j < n && !turnsAt(loop, j) && !turnsAt(loop, (j + 1) % n)) j += 1;
+      const b = mids[j % n];
+      parts.push(`L${fmt(b.x)} ${fmt(b.y)}`);
+      i = j;
+      continue;
+    }
     const a = mids[i];
     const b = mids[(i + 1) % n];
     const tA = pathTangent(loop, i);
     const tB = pathTangent(loop, (i + 1) % n);
-    const bouncedA = turnsAt(loop, i);
-    const bouncedB = turnsAt(loop, (i + 1) % n);
-    if (!bouncedA && !bouncedB) {
-      parts.push(`L${fmt(b.x)} ${fmt(b.y)}`);
-      continue;
-    }
-    // Cubic with matching tangents: 45° at a crossing, bisector at a bounce.
-    // This eases into teardrop petals and tighter corner horns.
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
-    const alpha = dist * (bouncedA && bouncedB ? 0.42 : 0.36);
+    const dot = tA[0] * tB[0] + tA[1] * tB[1];
+    let alphaScale: number;
+    if (isTightPetal(loop, i)) alphaScale = 0.42;
+    else if (bouncedA && bouncedB) alphaScale = 0.42;
+    else if (dot > 0.65) alphaScale = 0.5;
+    else if (dot > 0.2) alphaScale = 0.44;
+    else alphaScale = 0.36;
+    const alpha = dist * alphaScale;
     const c1x = a.x + tA[0] * alpha;
     const c1y = a.y + tA[1] * alpha;
     const c2x = b.x - tB[0] * alpha;
@@ -329,6 +350,7 @@ export function loopToPath(loop: Loop): string {
     parts.push(
       `C${fmt2(c1x)} ${fmt2(c1y)} ${fmt2(c2x)} ${fmt2(c2y)} ${fmt(b.x)} ${fmt(b.y)}`,
     );
+    i += 1;
   }
   parts.push("Z");
   return parts.join(" ");

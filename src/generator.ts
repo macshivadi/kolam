@@ -16,6 +16,8 @@ import { type MirrorGrid } from "./mirrors";
 import { loopToPath, traceLoops, type Loop } from "./tracer";
 import { canonicalGeometryHash } from "./canonical";
 import { constructSymmetricKolam } from "./construct";
+import { applyCurated, curatedForFestival, curatedForGrid } from "./library";
+import { festivalOn } from "./festivals";
 
 export type KolamPattern = {
   spec: GridSpec;
@@ -70,11 +72,18 @@ export function generateKolam(
 ): KolamPattern {
   const attempts = opts.attempts ?? 8;
   let best: KolamPattern | null = null;
+  const cap = (spec.n ? spec.n + 1 : Math.max(...(spec.rows ?? [1])) + 1) * 4;
   for (let sub = 0; sub < attempts; sub++) {
     const s = attemptSeed(seed, sub);
+    // Same traditional recipes as the curated library, with seed-unique
+    // decorative variation so consecutive Generate taps stay distinct.
     const pattern = fromGrid(constructSymmetricKolam(spec, s), seed, sub);
-    if (!best || pattern.uncovered.length < best.uncovered.length) best = pattern;
-    if (best.uncovered.length === 0) return best;
+    const better =
+      !best ||
+      pattern.uncovered.length < best.uncovered.length ||
+      (pattern.uncovered.length === best.uncovered.length && pattern.loopCount < best.loopCount);
+    if (better) best = pattern;
+    if (pattern.uncovered.length === 0 && pattern.loopCount <= cap) return pattern;
   }
   return best!;
 }
@@ -111,6 +120,17 @@ export function placeDailyMirrors(
 ): MirrorGrid {
   const spec = dailyGridSpec(dateStr, launch);
   const s = attemptSeed(seedFromDate(dateStr), subSeed);
+  const fest = festivalOn(dateStr);
+  // Festival days open with curated classics (may use a fitting traditional grid).
+  if (fest && subSeed < 8) {
+    const list = curatedForFestival(fest.id);
+    if (list.length) return applyCurated(list[(s + subSeed) % list.length]);
+  }
+  // Even sub-seeds frequently use a classic on the day's usual grid.
+  if (subSeed % 2 === 0) {
+    const list = curatedForGrid(spec.id);
+    if (list.length) return applyCurated(list[(s >>> 0) % list.length]);
+  }
   return constructSymmetricKolam(spec, s);
 }
 
@@ -123,18 +143,17 @@ export function resolveDailyRecord(
   priorHashes: Set<string>,
   launch: string = LAUNCH_DATE,
 ): DailyRecord {
-  const gridId = dailyGridId(dateStr, launch);
   for (let sub = 0; sub < DAILY_ATTEMPTS; sub++) {
     const grid = placeDailyMirrors(dateStr, sub, launch);
     const key = canonicalGeometryHash(grid, traceLoops(grid).loops);
     if (priorHashes.has(key)) continue;
-    return { date: dateStr, gridId, subSeed: sub, canonicalHash: key };
+    return { date: dateStr, gridId: grid.spec.id, subSeed: sub, canonicalHash: key };
   }
   // Extremely unlikely; still return a tagged last-attempt pattern.
   const grid = placeDailyMirrors(dateStr, DAILY_ATTEMPTS, launch);
   return {
     date: dateStr,
-    gridId,
+    gridId: grid.spec.id,
     subSeed: DAILY_ATTEMPTS,
     canonicalHash: canonicalGeometryHash(grid, traceLoops(grid).loops),
   };

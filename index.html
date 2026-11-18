@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>கோலம் · Kolam</title>
     <meta name="description" content="A new sikku kolam every day. Practice the pattern, save it, or print it to draw at home." />
-    <meta name="theme-color" content="#1a1540" />
+    <meta name="theme-color" content="#f5eadc" />
     <link rel="canonical" href="https://macshivadi.github.io/kolam/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Kolam" />
@@ -52,40 +52,6 @@
           </svg>
         </button>
       </header>
-      <p class="tagline">A new sikku kolam every day. Watch it, trace it, save it.</p>
-
-      <div class="thoranam" aria-hidden="true">
-        <svg viewBox="0 0 400 28" preserveAspectRatio="xMidYMid meet">
-          <path class="thora-cord" d="M0 6 Q 50 18 100 6 T 200 6 T 300 6 T 400 6" fill="none" stroke-width="1.2"/>
-          <g class="thora-leaf">
-            <ellipse cx="25" cy="16" rx="7" ry="4" transform="rotate(-25 25 16)"/>
-            <ellipse cx="50" cy="18" rx="7" ry="4" transform="rotate(18 50 18)"/>
-            <ellipse cx="75" cy="16" rx="7" ry="4" transform="rotate(-20 75 16)"/>
-            <ellipse cx="100" cy="18" rx="7" ry="4" transform="rotate(22 100 18)"/>
-            <ellipse cx="125" cy="16" rx="7" ry="4" transform="rotate(-18 125 16)"/>
-            <ellipse cx="150" cy="18" rx="7" ry="4" transform="rotate(20 150 18)"/>
-            <ellipse cx="175" cy="16" rx="7" ry="4" transform="rotate(-22 175 16)"/>
-            <ellipse cx="200" cy="18" rx="7" ry="4" transform="rotate(18 200 18)"/>
-            <ellipse cx="225" cy="16" rx="7" ry="4" transform="rotate(-20 225 16)"/>
-            <ellipse cx="250" cy="18" rx="7" ry="4" transform="rotate(22 250 18)"/>
-            <ellipse cx="275" cy="16" rx="7" ry="4" transform="rotate(-18 275 16)"/>
-            <ellipse cx="300" cy="18" rx="7" ry="4" transform="rotate(20 300 18)"/>
-            <ellipse cx="325" cy="16" rx="7" ry="4" transform="rotate(-22 325 16)"/>
-            <ellipse cx="350" cy="18" rx="7" ry="4" transform="rotate(18 350 18)"/>
-            <ellipse cx="375" cy="16" rx="7" ry="4" transform="rotate(-20 375 16)"/>
-          </g>
-          <g class="thora-flower">
-            <circle cx="37" cy="10" r="2.2"/>
-            <circle cx="87" cy="10" r="2.2"/>
-            <circle cx="137" cy="10" r="2.2"/>
-            <circle cx="187" cy="10" r="2.2"/>
-            <circle cx="237" cy="10" r="2.2"/>
-            <circle cx="287" cy="10" r="2.2"/>
-            <circle cx="337" cy="10" r="2.2"/>
-            <circle cx="387" cy="10" r="2.2"/>
-          </g>
-        </svg>
-      </div>
 
       <section class="hero">
         <div class="hero-meta">
@@ -99,32 +65,19 @@
         </div>
         <p id="canvas-label" class="canvas-label" hidden>Your kolam</p>
         <div id="stage" class="stage" role="img" aria-label="Today's kolam"></div>
-        <div class="color-toggle no-print" role="group" aria-label="Rice flour or rangoli color">
-          <button type="button" id="color-white" aria-pressed="false">White</button>
-          <button type="button" id="color-on" aria-pressed="false">Color</button>
-        </div>
         <div class="primary-actions no-print">
           <button type="button" id="replay" class="btn">Draw along</button>
           <button type="button" id="save-png" class="btn">Save</button>
           <button type="button" id="share" class="btn btn-primary">Share</button>
         </div>
         <div id="draw-along" class="draw-along no-print" hidden>
-          <div class="draw-tabs">
-            <button type="button" id="watch-tab" aria-pressed="true">Watch</button>
-            <button type="button" id="trace-tab" aria-pressed="false">Trace</button>
-            <button type="button" id="draw-close" class="pill">Done</button>
-          </div>
           <div id="watch-controls">
             <button type="button" id="watch-pause" class="btn">Pause</button>
             <div class="speed" role="group" aria-label="Speed">
               <button type="button" id="speed-slow" data-speed="slow" aria-pressed="true">Slow</button>
               <button type="button" id="speed-normal" data-speed="normal" aria-pressed="false">Normal</button>
             </div>
-          </div>
-          <div id="trace-controls" hidden>
-            <p id="trace-progress" class="trace-progress">0%</p>
-            <p class="trace-hint">Trace the glowing line with your finger. The canvas only responds in this mode.</p>
-            <button type="button" id="trace-reset" class="btn">Start over</button>
+            <button type="button" id="draw-close" class="pill">Done</button>
           </div>
         </div>
       </section>
@@ -142,18 +95,7 @@
           <button type="button" class="chip" data-grid="d7">7–1</button>
           <button type="button" class="chip" data-grid="d9">9–1</button>
           <button type="button" class="chip" data-grid="d95">9–5</button>
-        </fieldset>
-        <fieldset class="chip-row" id="style-picker">
-          <legend>Style</legend>
-          <button type="button" class="chip" data-style="auto">Auto</button>
-          <button type="button" class="chip" data-style="line">Line</button>
-          <button type="button" class="chip" data-style="color">Color</button>
-          <button type="button" class="chip" data-style="diwali">Diwali</button>
-          <button type="button" class="chip" data-style="harvest">Pongal · Sankranti</button>
-          <button type="button" class="chip" data-style="christmas">Christmas</button>
-          <button type="button" class="chip" data-style="onam">Onam</button>
-          <button type="button" class="chip" data-style="navaratri">Navaratri</button>
-          <button type="button" class="chip" data-style="karthigai">Karthigai</button>
+          <button type="button" class="chip" data-grid="d158">15–8</button>
         </fieldset>
         <button type="button" id="generate" class="btn btn-primary">Generate</button>
       </details>
@@ -174,6 +116,11 @@
         <div class="sheet-head">
           <h2 id="menu-title">Menu</h2>
           <button type="button" class="icon-btn" data-close="menu" aria-label="Close menu">×</button>
+        </div>
+        <p class="menu-label">Rice flour or rangoli color</p>
+        <div class="color-toggle" role="group" aria-label="Rice flour or rangoli color">
+          <button type="button" id="color-white" aria-pressed="false">White</button>
+          <button type="button" id="color-on" aria-pressed="false">Color</button>
         </div>
         <label class="toggle">
           <input type="checkbox" id="sound-toggle" />
