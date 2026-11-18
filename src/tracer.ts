@@ -291,21 +291,47 @@ export function loopToPath(loop: Loop): string {
   for (let i = 0; i < n; i++) {
     const a = mids[i];
     const b = mids[(i + 1) % n];
-    // Direction changes at b when that midpoint has a mirror.
-    const arrivedDx = loop.dirs[i][0];
-    const arrivedDy = loop.dirs[i][1];
-    const leave = loop.dirs[(i + 1) % n];
-    const bounced = leave[0] !== arrivedDx || leave[1] !== arrivedDy;
-    if (bounced) {
-      const c = squareCenterOf(a, b);
-      const sweep = sweepFlag(a, b, c);
-      parts.push(`A0.5 0.5 0 0 ${sweep} ${fmt(b.x)} ${fmt(b.y)}`);
-    } else {
+    const tA = pathTangent(loop, i);
+    const tB = pathTangent(loop, (i + 1) % n);
+    const bouncedA = turnsAt(loop, i);
+    const bouncedB = turnsAt(loop, (i + 1) % n);
+    if (!bouncedA && !bouncedB) {
       parts.push(`L${fmt(b.x)} ${fmt(b.y)}`);
+      continue;
     }
+    // Cubic with matching tangents: 45° at a crossing, bisector at a bounce.
+    // This eases into teardrop petals and tighter corner horns.
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const alpha = dist * (bouncedA && bouncedB ? 0.42 : 0.36);
+    const c1x = a.x + tA[0] * alpha;
+    const c1y = a.y + tA[1] * alpha;
+    const c2x = b.x - tB[0] * alpha;
+    const c2y = b.y - tB[1] * alpha;
+    parts.push(
+      `C${fmt2(c1x)} ${fmt2(c1y)} ${fmt2(c2x)} ${fmt2(c2y)} ${fmt(b.x)} ${fmt(b.y)}`,
+    );
   }
   parts.push("Z");
   return parts.join(" ");
+}
+
+/** Unit tangent of the path at mid i (leave direction, or bounce bisector). */
+export function pathTangent(loop: Loop, i: number): [number, number] {
+  const n = loop.dirs.length;
+  const leave = loop.dirs[i];
+  const prev = loop.dirs[(i + n - 1) % n];
+  if (prev[0] === leave[0] && prev[1] === leave[1]) {
+    const len = Math.hypot(leave[0], leave[1]) || 1;
+    return [leave[0] / len, leave[1] / len];
+  }
+  const bx = prev[0] + leave[0];
+  const by = prev[1] + leave[1];
+  const len = Math.hypot(bx, by) || 1;
+  return [bx / len, by / len];
+}
+
+function fmt2(n: number): string {
+  return String(Math.round(n * 100) / 100);
 }
 
 function fmt(n: number): string {

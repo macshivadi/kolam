@@ -181,7 +181,7 @@ function renderChrome(state: State): void {
     back.hidden = isToday;
   } else {
     eyebrow.textContent = "A new kolam";
-    dateLabel.textContent = state.pattern.spec.label;
+    dateLabel.textContent = "";
     kolamNum.hidden = true;
     prev.disabled = true;
     next.disabled = true;
@@ -350,9 +350,6 @@ function wire(state: State): void {
   $("copy-link").addEventListener("click", () => {
     void copyInvite(state);
   });
-
-  const pulli = document.getElementById("pulli-label");
-  if (pulli) pulli.textContent = pulliLabel(state.pattern.spec);
 
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
     btn.addEventListener("click", () => {

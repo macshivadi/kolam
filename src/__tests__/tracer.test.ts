@@ -51,26 +51,25 @@ describe("mirror-curve tracer", () => {
     }
   });
 
-  it("covers all dots for a generated kolam (single-loop preference)", () => {
+  it("covers all dots for a generated kolam and stays D4-symmetric", () => {
     for (const id of ["5x5", "7x7", "d5"] as const) {
       const pattern = generateKolam(GRIDS[id], 20261117, { attempts: 32 });
       expect(pattern.uncovered).toEqual([]);
       expect(pattern.covered.length).toBe(pattern.grid.dots.length);
       expect(pattern.loopCount).toBeGreaterThanOrEqual(1);
-      expect(pattern.loopCount).toBeLessThanOrEqual(4);
+      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 4);
+      expect(isD4Symmetric(pattern.grid)).toBe(true);
     }
   });
 
-  it("prefers a single continuous loop when one is available", () => {
-    // A handful of seeds on the smaller grids; at least most should be 1 loop.
-    let singles = 0;
+  it("keeps generated 5×5 kolams covering every pulli under D4", () => {
     const n = 12;
     for (let i = 0; i < n; i++) {
       const pattern = generateKolam(GRIDS["5x5"], 1000 + i, { attempts: 24 });
       expect(pattern.uncovered).toEqual([]);
-      if (pattern.loopCount === 1) singles++;
+      expect(isD4Symmetric(pattern.grid)).toBe(true);
+      expect(pattern.loopCount).toBeGreaterThanOrEqual(1);
     }
-    expect(singles).toBeGreaterThanOrEqual(8);
   });
 });
 

@@ -3,43 +3,13 @@ import { type GridSpec } from "./grid";
 import {
   buildRegion,
   cloneMirrors,
-  listInteriorEdges,
   listOrbits,
   getEdge,
   setEdge,
   type EdgeRef,
   type MirrorGrid,
 } from "./mirrors";
-import { portId, traceLoops, type Mid } from "./tracer";
-
-class UnionFind {
-  private parent: number[];
-  private rank: number[];
-  constructor(n: number) {
-    this.parent = Array.from({ length: n }, (_, i) => i);
-    this.rank = new Array(n).fill(0);
-  }
-  find(a: number): number {
-    while (this.parent[a] !== a) {
-      this.parent[a] = this.parent[this.parent[a]];
-      a = this.parent[a];
-    }
-    return a;
-  }
-  union(a: number, b: number): boolean {
-    a = this.find(a);
-    b = this.find(b);
-    if (a === b) return false;
-    if (this.rank[a] < this.rank[b]) {
-      const t = a;
-      a = b;
-      b = t;
-    }
-    this.parent[b] = a;
-    if (this.rank[a] === this.rank[b]) this.rank[a] += 1;
-    return true;
-  }
-}
+import { traceLoops, type Mid } from "./tracer";
 
 function edgeMid(e: EdgeRef): Mid {
   if (e.kind === "h") return { x: e.x + 0.5, y: e.y };
@@ -59,16 +29,6 @@ export function squaresOfEdge(grid: MirrorGrid, e: EdgeRef): Array<[number, numb
   return out;
 }
 
-function squareIndex(sx: number, sy: number, W: number): number {
-  return sy * W + sx;
-}
-
-function allInteriorOn(base: MirrorGrid): MirrorGrid {
-  const grid = cloneMirrors(base);
-  for (const e of listInteriorEdges(grid)) setEdge(grid, e, true);
-  return grid;
-}
-
 function shuffle<T>(items: T[], seed: number): T[] {
   const rng = mulberry32(seed >>> 0);
   const a = items.slice();
@@ -81,134 +41,130 @@ function shuffle<T>(items: T[], seed: number): T[] {
   return a;
 }
 
+function applyOrbit(grid: MirrorGrid, orbit: EdgeRef[], value: boolean): void {
+  for (const e of orbit) setEdge(grid, e, value);
+}
+
+function toggleOrbit(grid: MirrorGrid, orbit: EdgeRef[]): MirrorGrid {
+  const next = cloneMirrors(grid);
+  for (const e of orbit) setEdge(next, e, !getEdge(grid, e));
+  return next;
+}
+
+export type OrbitKind = "center" | "corner" | "edge" | "interior";
+
+/** Classify a D4 orbit by where its midpoints sit relative to the grid center. */
+export function classifyOrbit(grid: MirrorGrid, orbit: EdgeRef[]): OrbitKind {
+  const c = grid.c;
+  let rSum = 0;
+  let diag = 0;
+  for (const e of orbit) {
+    const m = edgeMid(e);
+    const dx = m.x - c;
+    const dy = m.y - c;
+    rSum += Math.hypot(dx, dy);
+    if (Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.8) diag += 1;
+  }
+  const rNorm = rSum / orbit.length / (c + 0.01);
+  if (rNorm < 0.24) return "center";
+  if (rNorm > 0.74 && diag >= orbit.length / 2) return "corner";
+  if (rNorm > 0.62) return "edge";
+  return "interior";
+}
+
+function tinyLoopCount(lengths: number[]): number {
+  return lengths.filter((n) => n <= 8).length;
+}
+
 /**
- * A D4-symmetric opening of interior mirrors, grown like a symmetric
- * spanning forest on the dual of the unit squares. Because orbit sizes
- * are even, this typically bottoms out at 2 (sometimes 4) loops; a
- * single extra opening then splices them into one continuous line.
+ * Lower is better. A single loop is ideal; a small extra center circle is
+ * almost as good. Uncovered pulli are heavily penalized.
+ *
+ * On even-width square regions (our 5×5 / 7×7 / 9×9 / 11×11), a strict D4
+ * configuration cannot reach one loop — the empty interior already has
+ * n+1 loops — so "few, symmetric" is the realistic target.
+ */
+export function symmetryScore(grid: MirrorGrid): {
+  score: number;
+  loops: number;
+  uncovered: number;
+} {
+  const traced = traceLoops(grid);
+  const loops = traced.loops.length;
+  const uncovered = traced.uncovered.length;
+  if (uncovered > 0) {
+    return { score: 10_000 + uncovered * 200 + loops, loops, uncovered };
+  }
+  const tiny = tinyLoopCount(traced.loops.map((l) => l.mids.length));
+  let score: number;
+  if (loops <= 1) score = 0;
+  else if (loops === 2 && tiny === 1) score = 1;
+  else if (loops <= 4) score = 4 * (loops - 1);
+  else score = 8 * (loops - 1);
+  return { score, loops, uncovered };
+}
+
+/**
+ * Toggle whole D4 orbits only. Tight budget so a 10-year uniqueness walk stays fast.
+ */
+export function polishD4(grid: MirrorGrid, seed: number, maxTries = 8): MirrorGrid {
+  let current = grid;
+  let best = symmetryScore(current);
+  if (best.score <= 4) return current;
+
+  const orbits = shuffle(listOrbits(current), seed >>> 0);
+  let tries = 0;
+  let improved = true;
+  while (improved && tries < maxTries && best.score > 4) {
+    improved = false;
+    for (const orbit of orbits) {
+      if (tries >= maxTries) break;
+      const next = toggleOrbit(current, orbit);
+      const s = symmetryScore(next);
+      tries += 1;
+      if (s.score < best.score) {
+        current = next;
+        best = s;
+        improved = true;
+        if (s.score <= 4) return current;
+        break;
+      }
+    }
+  }
+  return current;
+}
+
+/**
+ * Place a sparse, D4-symmetric set of interior mirrors: mostly open crossings
+ * in the interior, petals and horns on the frame, sometimes a small circle
+ * around the center pulli. Every change is a whole orbit, so the drawn
+ * kolam stays 4-fold symmetric (including diamonds).
  */
 export function constructSymmetricKolam(spec: GridSpec, seed: number): MirrorGrid {
-  const base = buildRegion(spec);
-  const grid = allInteriorOn(base);
+  const grid = cloneMirrors(buildRegion(spec));
   const orbits = listOrbits(grid);
-  const uf = new UnionFind(grid.W * grid.W);
-  const order = shuffle(orbits, seed);
+  const rng = mulberry32(seed >>> 0);
+  const wantCenter = rng() < 0.34;
 
-  for (const orbit of order) {
-    let merges = false;
-    for (const e of orbit) {
-      const sq = squaresOfEdge(grid, e);
-      if (sq.length < 2) continue;
-      const a = squareIndex(sq[0][0], sq[0][1], grid.W);
-      const b = squareIndex(sq[1][0], sq[1][1], grid.W);
-      if (uf.find(a) !== uf.find(b)) {
-        merges = true;
-        break;
-      }
-    }
-    if (!merges) continue;
-    for (const e of orbit) {
-      setEdge(grid, e, false);
-      const sq = squaresOfEdge(grid, e);
-      if (sq.length === 2) {
-        uf.union(
-          squareIndex(sq[0][0], sq[0][1], grid.W),
-          squareIndex(sq[1][0], sq[1][1], grid.W),
-        );
-      }
-    }
+  for (const orbit of orbits) {
+    const kind = classifyOrbit(grid, orbit);
+    let p: number;
+    if (kind === "center") p = wantCenter ? 0.92 : 0.06;
+    else if (kind === "corner") p = 0.48;
+    else if (kind === "edge") p = 0.4;
+    else p = 0.1;
+    applyOrbit(grid, orbit, rng() < p);
   }
 
-  return polishToSingleLoop(spliceToSingleLoop(grid, seed), seed);
+  return polishD4(grid, seed);
 }
 
-/**
- * Open one interior mirror at a time where the two sides belong to
- * different loops, until a single loop remains (or no such splice exists).
- * The first splice is enough on most D4 constructions; a few more may
- * be used. Picks the splice deterministically from `seed`.
- */
+/** @deprecated D4-safe alias of polishD4. */
 export function spliceToSingleLoop(grid: MirrorGrid, seed: number): MirrorGrid {
-  let current = grid;
-  for (let step = 0; step < 32; step++) {
-    const traced = traceLoops(current);
-    if (traced.loops.length <= 1 && traced.uncovered.length === 0) return current;
-    const loopOfPort = new Map<number, number>();
-    for (const [li, loop] of traced.loops.entries()) {
-      for (let i = 0; i < loop.mids.length; i++) {
-        const [dx, dy] = loop.dirs[i];
-        loopOfPort.set(portId(current, loop.mids[i], dx, dy), li);
-      }
-    }
-
-    const candidates: EdgeRef[] = [];
-    for (const e of listInteriorEdges(current)) {
-      if (!edgeIsMirror(current, e)) continue;
-      const ports = portsOfMirroredEdge(current, e);
-      if (ports.length < 2) continue;
-      const la = loopOfPort.get(ports[0]);
-      const lb = loopOfPort.get(ports[1]);
-      if (la === undefined || lb === undefined) continue;
-      if (la !== lb) candidates.push(e);
-    }
-    if (candidates.length === 0) return current;
-
-    // Deterministic pick: sort by position, then choose by seed+step.
-    candidates.sort((a, b) =>
-      a.kind !== b.kind
-        ? a.kind < b.kind
-          ? -1
-          : 1
-        : a.y !== b.y
-          ? a.y - b.y
-          : a.x - b.x,
-    );
-    const rng = mulberry32((seed >>> 0) ^ Math.imul(step + 1, 0x9e3779b9));
-    const pick = candidates[Math.floor(rng() * candidates.length)];
-    const next = cloneMirrors(current);
-    setEdge(next, pick, false);
-    current = next;
-  }
-  return current;
+  return polishD4(grid, seed);
 }
 
-/**
- * If opening walls is not enough, toggling (often closing) a remaining
- * edge can splice the last two loops into one. Bounded and deterministic.
- */
+/** @deprecated D4-safe alias of polishD4. */
 export function polishToSingleLoop(grid: MirrorGrid, seed: number): MirrorGrid {
-  let current = grid;
-  let loops = traceLoops(current).loops.length;
-  if (loops <= 1) return current;
-
-  const order = shuffle(listInteriorEdges(current), (seed >>> 0) ^ 0x51ed);
-
-  for (let step = 0; step < 16 && loops > 1; step++) {
-    let improved = false;
-    for (const e of order) {
-      const next = cloneMirrors(current);
-      setEdge(next, e, !getEdge(current, e));
-      const t = traceLoops(next);
-      if (t.uncovered.length === 0 && t.loops.length < loops) {
-        current = next;
-        loops = t.loops.length;
-        improved = true;
-        break;
-      }
-    }
-    if (!improved) break;
-  }
-  return current;
-}
-
-function edgeIsMirror(grid: MirrorGrid, e: EdgeRef): boolean {
-  return e.kind === "h" ? grid.h[e.x][e.y] : grid.v[e.x][e.y];
-}
-
-function portsOfMirroredEdge(grid: MirrorGrid, e: EdgeRef): number[] {
-  const m = edgeMid(e);
-  if (e.kind === "v") {
-    return [portId(grid, m, 1, 1), portId(grid, m, -1, 1)];
-  }
-  return [portId(grid, m, 1, 1), portId(grid, m, 1, -1)];
+  return polishD4(grid, seed);
 }

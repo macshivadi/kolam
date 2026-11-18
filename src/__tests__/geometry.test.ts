@@ -4,6 +4,7 @@ import { GRIDS, pulliLabel } from "../grid";
 import {
   buildRegion,
   cloneMirrors,
+  isD4Symmetric,
   listInteriorEdges,
   setEdge,
 } from "../mirrors";
@@ -13,7 +14,7 @@ import {
   collectDailyHashes,
 } from "../generator";
 import { loopToPath, traceLoops } from "../tracer";
-import { canonicalGeometryHash, canonicalHash } from "../canonical";
+import { canonicalGeometryHash, canonicalHash, d4Point } from "../canonical";
 import { pointKey } from "../grid";
 
 function allInteriorOn(spec = GRIDS["7x7"]) {
@@ -46,8 +47,9 @@ describe("sikku path drawing", () => {
     const pattern = generateKolam(GRIDS["7x7"], 99);
     const drawn = pattern.paths.join(" ");
     expect(drawn.includes("L")).toBe(true);
-    expect(drawn.includes("A0.5")).toBe(true);
-    expect(pattern.loopCount).toBe(1);
+    expect(drawn.includes("C")).toBe(true);
+    expect(pattern.loopCount).toBeGreaterThanOrEqual(1);
+    expect(isD4Symmetric(pattern.grid)).toBe(true);
     expect(pattern.uncovered).toEqual([]);
     expect(isolatedDotLoopCount(pattern)).toBe(0);
     // Must not collapse to the all-mirrors-on path packing.
@@ -64,17 +66,19 @@ describe("sikku path drawing", () => {
     expect(b.canonicalHash).not.toBe(c.canonicalHash);
   });
 
-  it("is a single loop around every pulli for most days", () => {
-    let singles = 0;
+  it("covers every pulli with a D4-symmetric weaving for most days", () => {
     const n = 80;
     for (let i = 0; i < n; i++) {
       const pattern = kolamOfTheDay(addDays(LAUNCH_DATE, i));
+      expect(isD4Symmetric(pattern.grid)).toBe(true);
       expect(pattern.uncovered).toEqual([]);
       expect(isolatedDotLoopCount(pattern)).toBe(0);
       expect(pattern.paths.join(" ")).toMatch(/L/);
-      if (pattern.loopCount === 1) singles++;
+      // Strict D4 on even-width squares cannot reach a single loop
+      // (the empty interior already has n+1 loops). Keep the count modest.
+      expect(pattern.loopCount).toBeGreaterThanOrEqual(1);
+      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 4);
     }
-    expect(singles / n).toBeGreaterThanOrEqual(0.9);
   });
 
   it("hashes uniqueness from the rendered geometry, not unused mirror bits", () => {
@@ -89,6 +93,27 @@ describe("sikku path drawing", () => {
     const hashes = collectDailyHashes(120);
     expect(new Set(hashes).size).toBe(120);
     expect(hashes[0]).toBe(kolamOfTheDay(LAUNCH_DATE).canonicalHash);
+  });
+
+  it("keeps mirrors and rendered geometry 4-fold symmetric", () => {
+    const dates = [LAUNCH_DATE, "2026-11-16", "2026-11-18", "2026-11-20"];
+    for (const date of dates) {
+      const pattern = kolamOfTheDay(date);
+      expect(isD4Symmetric(pattern.grid)).toBe(true);
+      const rotated = pattern.loops.map((loop) => ({
+        ...loop,
+        mids: loop.mids.map((m) => {
+          const [x, y] = d4Point(m.x, m.y, 1, pattern.grid.c);
+          return { x, y };
+        }),
+      }));
+      expect(canonicalGeometryHash(pattern.grid, rotated)).toBe(pattern.canonicalHash);
+    }
+    for (const seed of [1, 7, 42, 99, 20261117]) {
+      const pattern = generateKolam(GRIDS["7x7"], seed);
+      expect(isD4Symmetric(pattern.grid)).toBe(true);
+      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 4);
+    }
   });
 });
 

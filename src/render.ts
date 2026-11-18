@@ -19,13 +19,13 @@ function bounds(pattern: KolamPattern, padding: number) {
 }
 
 /** Tight viewBox in grid units, with a little margin around the frame. */
-export function viewBoxFor(pattern: KolamPattern, padding = 0.65): string {
+export function viewBoxFor(pattern: KolamPattern, padding = 1.15): string {
   const b = bounds(pattern, padding);
   return `${b.minX} ${b.minY} ${b.width} ${b.height}`;
 }
 
 export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
-  const padding = opts.padding ?? 0.65;
+  const padding = opts.padding ?? 1.15;
   const theme = opts.theme;
   const vb = viewBoxFor(pattern, padding);
   const animClass = opts.static ? "" : ' class="kolam-path"';
@@ -37,7 +37,7 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
       const delay = opts.static
         ? ""
         : ` style="animation-delay:${(strokeDelay + i * 0.35).toFixed(2)}s"`;
-      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.14" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay}/>`;
+      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay}/>`;
     })
     .join("\n");
   const dots = pattern.grid.dots
@@ -45,7 +45,7 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
       const delay = opts.static
         ? ""
         : ` class="kolam-dot" style="animation-delay:${((p.y - 1) * rowDelay).toFixed(2)}s"`;
-      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="0.11" fill="${theme.dot}"/>`;
+      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="0.085" fill="${theme.dot}"/>`;
     })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">
@@ -61,7 +61,7 @@ ${dots}
 
 /** 1200×630 Open Graph image as SVG, with the kolam centered on the floor. */
 export function ogShareSvg(pattern: KolamPattern, theme: Theme, caption?: string): string {
-  const padding = 0.65;
+  const padding = 1.15;
   const vb = viewBoxFor(pattern, padding);
   const inner = kolamSvg(pattern, { theme, static: true, padding });
   // Extract inner content (no outer svg wrapper) by reusing the same drawing.

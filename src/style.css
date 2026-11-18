@@ -213,12 +213,24 @@ body {
 .stage,
 .day-article .stage {
   margin: 12px auto 20px;
-  width: min(100%, 92vw, 560px);
+  width: min(100%, 94vw, 520px);
   aspect-ratio: 1;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
   background: var(--floor);
+}
+
+@media (max-width: 430px) {
+  .page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .stage,
+  .day-article .stage {
+    margin: 8px auto 14px;
+    width: min(100%, calc(100vw - 32px), 520px);
+  }
 }
 
 .stage svg,
