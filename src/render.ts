@@ -9,8 +9,23 @@ import { motifSvg } from "./motifs";
 export const STROKE_RATIO = 0.09;
 export const STROKE_WIDTH = 0.09;
 
+/** Plain white pulli — same in classic, festival, color, and dusk. */
+export const PULLI_FILL = "#ffffff";
+/** Radius as a fraction of pulli spacing; kept well inside the loop hole. */
+export const PULLI_RADIUS_RATIO = 0.05;
+
 export function strokeWidthFor(spec: Parameters<typeof dotSpacing>[0]): number {
   return STROKE_RATIO * dotSpacing(spec);
+}
+
+export function pulliRadiusFor(spec: Parameters<typeof dotSpacing>[0]): number {
+  const sp = dotSpacing(spec);
+  const stroke = strokeWidthFor(spec);
+  // Mid-edge loops sit ~half a spacing from the pulli. Leave at least one
+  // stroke-width of clear floor between the filled dot and the line.
+  const hole = 0.5 * sp - 0.5 * stroke;
+  const maxR = Math.max(0.02 * sp, hole - stroke);
+  return Math.min(PULLI_RADIUS_RATIO * sp, maxR);
 }
 
 export function defaultPaddingFor(pattern: KolamPattern, hasMotifs: boolean): number {
@@ -30,8 +45,6 @@ export type SvgOptions = {
   fills?: FillRegion[];
   /** Festival / decorative motifs drawn with the kolam. */
   style?: KolamStyleId;
-  /** Gold ring around each pulli — dusk / night stone-floor look. */
-  goldRings?: boolean;
 };
 
 function bounds(pattern: KolamPattern, padding: number) {
@@ -105,16 +118,10 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
   const dots = pattern.grid.dots
     .map((p) => {
       const delay = opts.static
-        ? opts.goldRings
-          ? ` class="kolam-dot"`
-          : ""
+        ? ` class="kolam-dot"`
         : ` class="kolam-dot" style="animation-delay:${((p.y - 1) * rowDelay).toFixed(2)}s"`;
-      const sp = dotSpacing(pattern.spec);
-      const dotR = 0.06 * sp;
-      if (opts.goldRings) {
-        return `    <g${delay}><circle class="kolam-dot-ring" cx="${p.x}" cy="${p.y}" r="${(0.09 * sp).toFixed(3)}" fill="none" stroke="#e8c547" stroke-width="${(0.025 * sp).toFixed(3)}"/><circle cx="${p.x}" cy="${p.y}" r="${dotR.toFixed(3)}" fill="${theme.dot}"/></g>`;
-      }
-      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="${dotR.toFixed(3)}" fill="${theme.dot}"/>`;
+      const dotR = pulliRadiusFor(pattern.spec);
+      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="${dotR.toFixed(3)}" fill="${PULLI_FILL}"/>`;
     })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">

@@ -263,10 +263,14 @@ html[data-ambience="night"] .lamp-flame {
   .stage { width: 100%; margin: 6px auto 10px; }
 }
 
+.kolam-dots circle,
 .kolam-dot {
+  fill: #fff;
+  stroke: none;
   opacity: 0;
   animation: pulli-in 0.4s ease-out forwards;
 }
+.kolam-dot-ring { display: none; }
 @keyframes pulli-in { from { opacity: 0; } to { opacity: 1; } }
 
 .kolam-path {

@@ -209,8 +209,7 @@ function renderStage(state: State, opts: { slow?: boolean; static?: boolean } = 
   const stage = $("stage");
   const theme = { ...THEMES[state.themeId] };
   const amb = currentAmbience();
-  const goldRings = amb === "dusk" || amb === "night";
-  if (goldRings && state.themeId === "classic") {
+  if ((amb === "dusk" || amb === "night") && state.themeId === "classic") {
     theme.floor = amb === "dusk" ? "#12100e" : "#0e0c0b";
   }
   const slow = Boolean(opts.slow);
@@ -221,7 +220,6 @@ function renderStage(state: State, opts: { slow?: boolean; static?: boolean } = 
     static: asStatic,
     fills: fillsFor(state),
     style: state.styleId,
-    goldRings,
   });
   stage.classList.remove("is-tracing");
   stage.classList.remove("is-complete");
