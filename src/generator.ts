@@ -194,6 +194,28 @@ export function placeDailyMirrors(
   return placeDaily(dateStr, subSeed, launch).grid;
 }
 
+
+/** Memoize drawn-geometry hashes so a 10-year walk traces each unique pattern once. */
+const placementHashCache = new Map<string, string>();
+
+function placementCacheKey(placed: DailyPlacement): string {
+  // Curated patterns are immutable; generated ones must not share a key,
+  // because D4-normalized mirror bits can collide across distinct drawings.
+  if (!placed.patternId.startsWith("gen:")) return `curated:${placed.patternId}`;
+  return "";
+}
+
+function hashPlacement(placed: DailyPlacement): string {
+  const ck = placementCacheKey(placed);
+  if (ck) {
+    const hit = placementHashCache.get(ck);
+    if (hit) return hit;
+  }
+  const key = canonicalGeometryHash(placed.grid, traceLoops(placed.grid).loops);
+  if (ck) placementHashCache.set(ck, key);
+  return key;
+}
+
 /**
  * Pick the first sub-seed whose D4-normalized hash is not in `priorHashes`.
  * Does not trace — cheap enough to walk thousands of days on the client.
@@ -207,7 +229,7 @@ export function resolveDailyRecord(
   let fallback: DailyRecord | null = null;
   for (let sub = 0; sub < DAILY_ATTEMPTS; sub++) {
     const placed = placeDaily(dateStr, sub, launch);
-    const key = canonicalGeometryHash(placed.grid, traceLoops(placed.grid).loops);
+    const key = hashPlacement(placed);
     const rec: DailyRecord = {
       date: dateStr,
       gridId: placed.grid.spec.id,
@@ -230,7 +252,7 @@ export function resolveDailyRecord(
     date: dateStr,
     gridId: placed.grid.spec.id,
     subSeed: DAILY_ATTEMPTS,
-    canonicalHash: canonicalGeometryHash(placed.grid, traceLoops(placed.grid).loops),
+    canonicalHash: hashPlacement(placed),
     patternId: placed.patternId,
   };
 }

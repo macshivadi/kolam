@@ -3,7 +3,6 @@ import { LAUNCH_DATE, addDays, kolamNumber } from "../dateSeed";
 import { DAILY_GRID_CYCLE, GRIDS } from "../grid";
 import { listOrbits, buildRegion } from "../mirrors";
 import {
-  collectDailyHashes,
   dailyGridId,
   kolamOfTheDay,
   resolveDailySeries,
@@ -38,19 +37,15 @@ describe("daily grid cycle", () => {
 });
 
 describe("daily uniqueness over ~10 years", () => {
-  it("gives the first 3650 days distinct D4-normalized hashes, quickly", () => {
+  it("gives the first 3650 days distinct D4-normalized hashes, quickly, with varied adjacent days", () => {
     const started = Date.now();
-    const hashes = collectDailyHashes(3650);
+    const series = resolveDailySeries(addDays(LAUNCH_DATE, 3649));
     const elapsed = Date.now() - started;
-    expect(hashes).toHaveLength(3650);
+    expect(series).toHaveLength(3650);
+    const hashes = series.map((r) => r.canonicalHash);
     expect(new Set(hashes).size).toBe(3650);
     // Must stay fast enough for CI and for a client walk of prior days.
     expect(elapsed).toBeLessThan(20_000);
-  });
-
-  it("never repeats grid or pattern on adjacent days, and varies grids in each week", () => {
-    const series = resolveDailySeries(addDays(LAUNCH_DATE, 3649));
-    expect(series).toHaveLength(3650);
     for (let i = 1; i < series.length; i++) {
       expect(series[i].gridId, series[i].date).not.toBe(series[i - 1].gridId);
       expect(series[i].patternId, series[i].date).not.toBe(series[i - 1].patternId);
