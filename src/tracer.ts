@@ -246,17 +246,63 @@ export function portCount(grid: MirrorGrid): number {
   return ports.size;
 }
 
-/** SVG path in grid units: a chain of quarter-circles around vertices. */
+/**
+ * Center of the unit square that has midpoints `a` and `b` on adjacent sides.
+ * Used to round a mirror bounce inside the square (not around a pulli).
+ */
+export function squareCenterOf(a: Mid, b: Mid): Point {
+  if (isVerticalMid(a) && !isVerticalMid(b)) {
+    return {
+      x: a.x + 0.5 * Math.sign(b.x - a.x),
+      y: b.y + 0.5 * Math.sign(a.y - b.y),
+    };
+  }
+  if (!isVerticalMid(a) && isVerticalMid(b)) {
+    return {
+      x: b.x + 0.5 * Math.sign(a.x - b.x),
+      y: a.y + 0.5 * Math.sign(b.y - a.y),
+    };
+  }
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+/** True when the leave direction changes at mid `i` (a mirror bounce). */
+export function turnsAt(loop: Loop, i: number): boolean {
+  const n = loop.dirs.length;
+  if (n === 0) return false;
+  const prev = loop.dirs[(i + n - 1) % n];
+  const cur = loop.dirs[i];
+  return prev[0] !== cur[0] || prev[1] !== cur[1];
+}
+
+/**
+ * SVG path in grid units, in the traditional sikku style:
+ * straight 45° strokes through crossings (between pulli) and a quarter-circle
+ * inside the unit square at a mirror bounce (lobes, petals, horns).
+ * Drawing every step as a quarter-circle around a vertex was wrong: it filled
+ * a circle around every dot regardless of the mirrors, so every pattern looked
+ * the same.
+ */
 export function loopToPath(loop: Loop): string {
   const mids = loop.mids;
-  if (mids.length === 0) return "";
+  const n = mids.length;
+  if (n === 0) return "";
   const parts = [`M${fmt(mids[0].x)} ${fmt(mids[0].y)}`];
-  for (let i = 0; i < mids.length; i++) {
+  for (let i = 0; i < n; i++) {
     const a = mids[i];
-    const b = mids[(i + 1) % mids.length];
-    const v = loop.vertices[i] ?? arcVertex(a, b);
-    const sweep = sweepFlag(a, b, v);
-    parts.push(`A0.5 0.5 0 0 ${sweep} ${fmt(b.x)} ${fmt(b.y)}`);
+    const b = mids[(i + 1) % n];
+    // Direction changes at b when that midpoint has a mirror.
+    const arrivedDx = loop.dirs[i][0];
+    const arrivedDy = loop.dirs[i][1];
+    const leave = loop.dirs[(i + 1) % n];
+    const bounced = leave[0] !== arrivedDx || leave[1] !== arrivedDy;
+    if (bounced) {
+      const c = squareCenterOf(a, b);
+      const sweep = sweepFlag(a, b, c);
+      parts.push(`A0.5 0.5 0 0 ${sweep} ${fmt(b.x)} ${fmt(b.y)}`);
+    } else {
+      parts.push(`L${fmt(b.x)} ${fmt(b.y)}`);
+    }
   }
   parts.push("Z");
   return parts.join(" ");

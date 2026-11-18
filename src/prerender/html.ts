@@ -13,6 +13,7 @@ import {
 } from "../paths";
 import { kolamSvg, ogShareSvg } from "../render";
 import { THEMES } from "../themes";
+import { pulliLabel } from "../grid";
 import { festivalOn } from "../festivals";
 
 export type AssetRefs = {
@@ -152,7 +153,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
       <p class="eyebrow" id="eyebrow">Kolam of the Day</p>
       <h1>${escapeHtml(festival ? `${festival.name} Kolam for ${shortDateLabel(date)}` : `Kolam for ${shortDateLabel(date)}`)}</h1>
       ${festival ? `<p id="festival-banner" class="festival-banner">${escapeHtml(festival.greeting)}${festival.dayLabel && festival.dayLabel !== festival.name ? ` · ${escapeHtml(festival.dayLabel)}` : ""}</p>` : `<p id="festival-banner" class="festival-banner" hidden></p>`}
-      <p class="day-meta">${escapeHtml(pattern.spec.label)}${numHtml}</p>
+      <p class="day-meta">${escapeHtml(pulliLabel(pattern.spec))}${numHtml}</p>
       <nav class="day-links" aria-label="Other days">
         ${prevLink}
         <a class="day-nav-link" href="${homeHref}">Home</a>
@@ -166,6 +167,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
         <div class="date-block">
           <p id="date-label" class="date-label">${escapeHtml(shortDateLabel(date))}</p>
           <p id="kolam-num" class="kolam-num">${number >= 1 ? `#${number}` : ""}</p>
+            <p id="pulli-label" class="pulli-label">${escapeHtml(pulliLabel(pattern.spec))}</p>
         </div>
         <button type="button" id="next-day" class="icon-btn" aria-label="Next day">→</button>
       </div>
@@ -185,9 +187,10 @@ export function buildDayPage(input: DayPageInput): DayPage {
         <button type="button" class="chip" data-grid="7x7">7×7</button>
         <button type="button" class="chip" data-grid="9x9">9×9</button>
         <button type="button" class="chip" data-grid="11x11">11×11</button>
-        <button type="button" class="chip" data-grid="d5">1-3-5-3-1</button>
-        <button type="button" class="chip" data-grid="d7">1-3-5-7-5-3-1</button>
-        <button type="button" class="chip" data-grid="d9">1-3-5-7-9-7-5-3-1</button>
+        <button type="button" class="chip" data-grid="d5">5-1</button>
+        <button type="button" class="chip" data-grid="d7">7-1</button>
+        <button type="button" class="chip" data-grid="d9">9-1</button>
+        <button type="button" class="chip" data-grid="d95">9-5</button>
       </fieldset>
       <button type="button" id="generate" class="btn btn-primary">Generate</button>
       <fieldset class="chip-row">

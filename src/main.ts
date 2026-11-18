@@ -1,6 +1,6 @@
 import { addDays, clampToPastOrToday, isValidDateString, kolamNumber, localDateString } from "./dateSeed";
 import { appRootFromPathname, datePath, datePageUrl, parseDatePath, resolveSiteUrl } from "./paths";
-import { GRIDS, GRID_IDS, type GridId } from "./grid";
+import { GRIDS, GRID_IDS, pulliLabel, type GridId } from "./grid";
 import { generateKolam, kolamOfTheDay, type KolamPattern } from "./generator";
 import { hashString } from "./prng";
 import { kolamSvg } from "./render";
@@ -188,6 +188,9 @@ function renderChrome(state: State): void {
     back.hidden = false;
   }
 
+  const pulli = document.getElementById("pulli-label");
+  if (pulli) pulli.textContent = pulliLabel(state.pattern.spec);
+
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.grid === state.gridId));
   });
@@ -347,6 +350,9 @@ function wire(state: State): void {
   $("copy-link").addEventListener("click", () => {
     void copyInvite(state);
   });
+
+  const pulli = document.getElementById("pulli-label");
+  if (pulli) pulli.textContent = pulliLabel(state.pattern.spec);
 
   document.querySelectorAll<HTMLButtonElement>("[data-grid]").forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -29,14 +29,24 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
   const theme = opts.theme;
   const vb = viewBoxFor(pattern, padding);
   const animClass = opts.static ? "" : ' class="kolam-path"';
+  // Pulli appear first, row by row; the sikku stroke starts after the last row.
+  const rowDelay = 0.07;
+  const strokeDelay = 0.45 + pattern.grid.max * rowDelay;
   const paths = pattern.paths
     .map((d, i) => {
-      const delay = opts.static ? "" : ` style="animation-delay:${(i * 0.35).toFixed(2)}s"`;
+      const delay = opts.static
+        ? ""
+        : ` style="animation-delay:${(strokeDelay + i * 0.35).toFixed(2)}s"`;
       return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.14" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay}/>`;
     })
     .join("\n");
   const dots = pattern.grid.dots
-    .map((p) => `    <circle cx="${p.x}" cy="${p.y}" r="0.11" fill="${theme.dot}"/>`)
+    .map((p) => {
+      const delay = opts.static
+        ? ""
+        : ` class="kolam-dot" style="animation-delay:${((p.y - 1) * rowDelay).toFixed(2)}s"`;
+      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="0.11" fill="${theme.dot}"/>`;
+    })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">
   <rect x="${-padding}" y="${-padding}" width="${pattern.grid.W + padding * 2}" height="${pattern.grid.W + padding * 2}" fill="${theme.floor}"/>

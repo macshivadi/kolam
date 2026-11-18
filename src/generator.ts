@@ -14,7 +14,7 @@ import {
 } from "./grid";
 import { type MirrorGrid } from "./mirrors";
 import { loopToPath, traceLoops, type Loop } from "./tracer";
-import { canonicalHash } from "./canonical";
+import { canonicalGeometryHash } from "./canonical";
 import { constructSymmetricKolam } from "./construct";
 
 export type KolamPattern = {
@@ -46,7 +46,7 @@ function fromGrid(grid: MirrorGrid, seed: number, subSeed: number): KolamPattern
     covered: traced.covered,
     uncovered: traced.uncovered,
     loopCount: traced.loops.length,
-    canonicalHash: canonicalHash(grid),
+    canonicalHash: canonicalGeometryHash(grid, traced.loops),
     seed,
     subSeed,
   };
@@ -131,7 +131,7 @@ export function resolveDailyRecord(
   const gridId = dailyGridId(dateStr, launch);
   for (let sub = 0; sub < DAILY_ATTEMPTS; sub++) {
     const grid = placeDailyMirrors(dateStr, sub, launch);
-    const key = canonicalHash(grid, gridId);
+    const key = canonicalGeometryHash(grid, traceLoops(grid).loops);
     if (priorHashes.has(key)) continue;
     return { date: dateStr, gridId, subSeed: sub, canonicalHash: key };
   }
@@ -141,7 +141,7 @@ export function resolveDailyRecord(
     date: dateStr,
     gridId,
     subSeed: DAILY_ATTEMPTS,
-    canonicalHash: canonicalHash(grid, gridId),
+    canonicalHash: canonicalGeometryHash(grid, traceLoops(grid).loops),
   };
 }
 

@@ -2,7 +2,7 @@ export type Point = { x: number; y: number };
 
 export type GridKind = "square" | "diamond";
 
-export type GridId = "5x5" | "7x7" | "9x9" | "11x11" | "d5" | "d7" | "d9";
+export type GridId = "5x5" | "7x7" | "9x9" | "11x11" | "d5" | "d7" | "d9" | "d95";
 
 export type GridSpec = {
   id: GridId;
@@ -15,16 +15,17 @@ export type GridSpec = {
 };
 
 export const GRIDS: Record<GridId, GridSpec> = {
-  "5x5": { id: "5x5", label: "5×5", kind: "square", n: 5 },
-  "7x7": { id: "7x7", label: "7×7", kind: "square", n: 7 },
-  "9x9": { id: "9x9", label: "9×9", kind: "square", n: 9 },
-  "11x11": { id: "11x11", label: "11×11", kind: "square", n: 11 },
-  d5: { id: "d5", label: "1-3-5-3-1", kind: "diamond", rows: [1, 3, 5, 3, 1] },
-  d7: { id: "d7", label: "1-3-5-7-5-3-1", kind: "diamond", rows: [1, 3, 5, 7, 5, 3, 1] },
-  d9: { id: "d9", label: "1-3-5-7-9-7-5-3-1", kind: "diamond", rows: [1, 3, 5, 7, 9, 7, 5, 3, 1] },
+  "5x5": { id: "5x5", label: "5×5 pulli", kind: "square", n: 5 },
+  "7x7": { id: "7x7", label: "7×7 pulli", kind: "square", n: 7 },
+  "9x9": { id: "9x9", label: "9×9 pulli", kind: "square", n: 9 },
+  "11x11": { id: "11x11", label: "11×11 pulli", kind: "square", n: 11 },
+  d5: { id: "d5", label: "5-1 pulli", kind: "diamond", rows: [1, 3, 5, 3, 1] },
+  d7: { id: "d7", label: "7-1 pulli", kind: "diamond", rows: [1, 3, 5, 7, 5, 3, 1] },
+  d9: { id: "d9", label: "9-1 pulli", kind: "diamond", rows: [1, 3, 5, 7, 9, 7, 5, 3, 1] },
+  d95: { id: "d95", label: "9-5 pulli", kind: "diamond", rows: [5, 7, 9, 7, 5] },
 };
 
-export const GRID_IDS: GridId[] = ["5x5", "7x7", "9x9", "11x11", "d5", "d7", "d9"];
+export const GRID_IDS: GridId[] = ["5x5", "7x7", "9x9", "11x11", "d5", "d7", "d9", "d95"];
 
 /** Larger grids only, so ~10 years of days cannot exhaust the D4 pattern space. */
 export const DAILY_GRID_CYCLE: GridId[] = ["7x7", "9x9", "11x11", "d9"];
@@ -57,4 +58,13 @@ export function dotsForGrid(spec: GridSpec): Point[] {
 
 export function pointKey(x: number, y: number): string {
   return `${x},${y}`;
+}
+
+/** Traditional Tamil pulli-count name, e.g. "9×9 pulli" or "7-1 pulli". */
+export function pulliLabel(spec: GridSpec): string {
+  if (spec.kind === "square") return `${spec.n}×${spec.n} pulli`;
+  const rows = spec.rows!;
+  const max = Math.max(...rows);
+  const min = Math.min(...rows);
+  return `${max}-${min} pulli`;
 }
