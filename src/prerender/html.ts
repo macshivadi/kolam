@@ -15,6 +15,9 @@ import { kolamSvg, ogShareSvg } from "../render";
 import { THEMES } from "../themes";
 import { pulliLabel } from "../grid";
 import { festivalOn } from "../festivals";
+import { styleForFestival, styleUsesColor } from "../styles";
+import { colorRegions } from "../regions";
+import { defaultColorMode, rangoliPalette } from "../palettes";
 
 export type AssetRefs = {
   css?: string;
@@ -73,6 +76,17 @@ export function buildJsonLd(opts: {
   };
 }
 
+function compactHeroLine(date: string, number: number, pulli: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const pretty = new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+  const n = number >= 1 ? ` · #${number}` : "";
+  return `${pretty}${n} · ${pulli}`;
+}
+
 export function buildDayPage(input: DayPageInput): DayPage {
   const { date, pattern, minDate, maxDate } = input;
   const siteUrl = normalizeSiteUrl(input.siteUrl);
@@ -82,9 +96,14 @@ export function buildDayPage(input: DayPageInput): DayPage {
   const description = pageDescription(date, number, festival);
   const canonical = datePageUrl(siteUrl, date);
   const ogImage = ogImageUrl(siteUrl, date);
+  const style = festival ? styleForFestival(festival.id) : (defaultColorMode(Math.max(number, 0)) ? "color" : "line");
   const theme = THEMES[festival?.theme ?? "classic"];
-  const svg = kolamSvg(pattern, { theme, static: true });
-  const ogSvg = ogShareSvg(pattern, theme, `கோலம் · ${shortDateLabel(date)}`);
+  const autoColor = defaultColorMode(Math.max(number, 0));
+  const fills = styleUsesColor(style, autoColor)
+    ? colorRegions(pattern, rangoliPalette(theme.id, festival?.id))
+    : undefined;
+  const svg = kolamSvg(pattern, { theme, static: true, fills, style });
+  const ogSvg = ogShareSvg(pattern, theme, `கோலம் · ${shortDateLabel(date)}`, style, fills);
   const jsonLd = buildJsonLd({ date, siteUrl, title, description, number });
   const prev = addDays(date, -1);
   const next = addDays(date, 1);
@@ -94,14 +113,13 @@ export function buildDayPage(input: DayPageInput): DayPage {
   const cssHref = input.assets.css ? `${prefix}${input.assets.css.replace(/^\.\//, "")}` : "";
   const jsSrc = input.assets.js ? `${prefix}${input.assets.js.replace(/^\.\//, "")}` : "";
 
-  const prevLink = showPrev
-    ? `<a class="day-nav-link" rel="prev" href="${relativeBetweenDates(date, prev)}">← ${shortDateLabel(prev)}</a>`
-    : `<span class="day-nav-link is-disabled">←</span>`;
-  const nextLink = showNext
-    ? `<a class="day-nav-link" rel="next" href="${relativeBetweenDates(date, next)}">${shortDateLabel(next)} →</a>`
-    : `<span class="day-nav-link is-disabled">→</span>`;
+  const prevHref = showPrev ? relativeBetweenDates(date, prev) : "";
+  const nextHref = showNext ? relativeBetweenDates(date, next) : "";
   const homeHref = prefix || "./";
-  const numHtml = number >= 1 ? ` <span class="kolam-num">#${number}</span>` : "";
+  const hero = compactHeroLine(date, number, pulliLabel(pattern.spec));
+  const festChip = festival
+    ? `<p id="festival-chip" class="festival-chip">${escapeHtml(festival.greeting)}${festival.dayLabel && festival.dayLabel !== festival.name ? ` · ${escapeHtml(festival.dayLabel)}` : ""}</p>`
+    : `<p id="festival-chip" class="festival-chip" hidden></p>`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -132,6 +150,7 @@ export function buildDayPage(input: DayPageInput): DayPage {
 </head>
 <body>
   <a class="skip" href="#stage">Skip to kolam</a>
+  <div class="sky" aria-hidden="true"></div>
   <div class="page">
     <header class="site-header">
       <a class="brand" href="${homeHref}">
@@ -144,80 +163,112 @@ export function buildDayPage(input: DayPageInput): DayPage {
             <path fill="currentColor" d="M720 425 L602.8663 264.4675 A145 145 0 1 1 837.1337 264.4675 Z"/>
           </svg>
         </span>
-        <span class="brand-text"><span lang="ta">கோலம்</span> · Kolam</span>
+        <span class="brand-text"><span lang="ta">கோலம்</span> <span class="dot">·</span> Kolam</span>
       </a>
-      <p class="tagline">A new sikku kolam every day. Save it, print it, draw it.</p>
+      <span class="lamp" id="lamp" hidden aria-hidden="true"></span>
+      <button type="button" id="menu-btn" class="icon-btn menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="menu-panel">☰</button>
     </header>
-
-    <article class="day-article">
-      <p class="eyebrow" id="eyebrow">Kolam of the Day</p>
-      <h1>${escapeHtml(festival ? `${festival.name} Kolam for ${shortDateLabel(date)}` : `Kolam for ${shortDateLabel(date)}`)}</h1>
-      ${festival ? `<p id="festival-banner" class="festival-banner">${escapeHtml(festival.greeting)}${festival.dayLabel && festival.dayLabel !== festival.name ? ` · ${escapeHtml(festival.dayLabel)}` : ""}</p>` : `<p id="festival-banner" class="festival-banner" hidden></p>`}
-      <p class="day-meta">${escapeHtml(pulliLabel(pattern.spec))}${numHtml}</p>
-      <nav class="day-links" aria-label="Other days">
-        ${prevLink}
-        <a class="day-nav-link" href="${homeHref}">Home</a>
-        ${nextLink}
-      </nav>
-    </article>
-
-    <section class="daily-bar" aria-live="polite">
-      <div class="date-nav">
-        <button type="button" id="prev-day" class="icon-btn" aria-label="Previous day">←</button>
-        <div class="date-block">
-          <p id="date-label" class="date-label">${escapeHtml(shortDateLabel(date))}</p>
-          <p id="kolam-num" class="kolam-num">${number >= 1 ? `#${number}` : ""}</p>
-            <p id="pulli-label" class="pulli-label">${escapeHtml(pulliLabel(pattern.spec))}</p>
-        </div>
-        <button type="button" id="next-day" class="icon-btn" aria-label="Next day">→</button>
+    <p class="tagline">A new sikku kolam every day. Watch it, trace it, save it.</p>
+    <section class="hero">
+      <div class="hero-meta">
+        ${showPrev ? `<a id="prev-day" class="icon-btn" rel="prev" href="${prevHref}" aria-label="Previous day">←</a>` : `<a id="prev-day" class="icon-btn" href="#" aria-label="Previous day" aria-disabled="true">←</a>`}
+        <h1 id="hero-line" class="hero-line">${escapeHtml(hero)}</h1>
+        ${showNext ? `<a id="next-day" class="icon-btn" rel="next" href="${nextHref}" aria-label="Next day">→</a>` : `<a id="next-day" class="icon-btn" href="#" aria-label="Next day" aria-disabled="true">→</a>`}
       </div>
-      <a id="permalink" class="permalink" href="">Permanent page</a>
-      <button type="button" id="back-today" class="text-btn" hidden>Today's kolam</button>
+      ${festChip}
+      <div class="hero-pills"><button type="button" id="back-today" class="pill" hidden>Today</button></div>
+      <p id="canvas-label" class="canvas-label" hidden>Your kolam</p>
+      <div id="stage" class="stage" role="img" aria-label="${escapeHtml(title)}">
+        ${svg}
+      </div>
+      <div class="color-toggle no-print" role="group" aria-label="Rice flour or rangoli color">
+        <button type="button" id="color-white">White</button>
+        <button type="button" id="color-on">Color</button>
+      </div>
+      <div class="primary-actions no-print">
+        <button type="button" id="replay" class="btn">Draw along</button>
+        <button type="button" id="save-png" class="btn">Save</button>
+        <button type="button" id="share" class="btn btn-primary">Share</button>
+      </div>
+      <div id="draw-along" class="draw-along no-print" hidden>
+        <div class="draw-tabs">
+          <button type="button" id="watch-tab" aria-pressed="true">Watch</button>
+          <button type="button" id="trace-tab">Trace</button>
+          <button type="button" id="draw-close" class="pill">Done</button>
+        </div>
+        <div id="watch-controls">
+          <button type="button" id="watch-pause" class="btn">Pause</button>
+          <div class="speed" role="group" aria-label="Speed">
+            <button type="button" id="speed-slow" data-speed="slow" aria-pressed="true">Slow</button>
+            <button type="button" id="speed-normal" data-speed="normal">Normal</button>
+          </div>
+        </div>
+        <div id="trace-controls" hidden>
+          <p id="trace-progress" class="trace-progress">0%</p>
+          <button type="button" id="trace-reset" class="btn">Start over</button>
+        </div>
+      </div>
     </section>
-
-    <div id="stage" class="stage" role="img" aria-label="${escapeHtml(title)}">
-      ${svg}
-    </div>
-
-    <div class="controls no-print">
-      <button type="button" id="replay" class="btn">Replay</button>
+    <details id="create-card" class="create-card no-print">
+      <summary>Create your own</summary>
+      <p class="create-hint">Pick a grid and tap Generate for a new pattern — today's kolam stays the same for everyone.</p>
       <fieldset class="chip-row">
         <legend>Grid</legend>
         <button type="button" class="chip" data-grid="5x5">5×5</button>
         <button type="button" class="chip" data-grid="7x7">7×7</button>
         <button type="button" class="chip" data-grid="9x9">9×9</button>
         <button type="button" class="chip" data-grid="11x11">11×11</button>
-        <button type="button" class="chip" data-grid="d5">5-1</button>
-        <button type="button" class="chip" data-grid="d7">7-1</button>
-        <button type="button" class="chip" data-grid="d9">9-1</button>
-        <button type="button" class="chip" data-grid="d95">9-5</button>
+        <button type="button" class="chip" data-grid="d5">5–1</button>
+        <button type="button" class="chip" data-grid="d7">7–1</button>
+        <button type="button" class="chip" data-grid="d9">9–1</button>
+        <button type="button" class="chip" data-grid="d95">9–5</button>
+      </fieldset>
+      <fieldset class="chip-row" id="style-picker">
+        <legend>Style</legend>
+        <button type="button" class="chip" data-style="auto">Auto</button>
+        <button type="button" class="chip" data-style="line">Line</button>
+        <button type="button" class="chip" data-style="color">Color</button>
+        <button type="button" class="chip" data-style="diwali">Diwali</button>
+        <button type="button" class="chip" data-style="harvest">Pongal · Sankranti</button>
+        <button type="button" class="chip" data-style="christmas">Christmas</button>
+        <button type="button" class="chip" data-style="onam">Onam</button>
+        <button type="button" class="chip" data-style="navaratri">Navaratri</button>
+        <button type="button" class="chip" data-style="karthigai">Karthigai</button>
       </fieldset>
       <button type="button" id="generate" class="btn btn-primary">Generate</button>
-      <fieldset class="chip-row">
-        <legend>Theme</legend>
-        <button type="button" class="chip" data-theme="classic">Classic</button>
-        <button type="button" class="chip" data-theme="pongal">Pongal · Sankranti</button>
-        <button type="button" class="chip" data-theme="diwali">Diwali</button>
-        <button type="button" class="chip" data-theme="christmas">Christmas</button>
-      </fieldset>
-      <div class="actions">
-        <button type="button" id="save-png" class="btn">Save PNG</button>
-        <button type="button" id="print" class="btn">Print</button>
-        <button type="button" id="share" class="btn btn-primary">Share</button>
-      </div>
-      <div class="share-row" aria-label="Share">
+    </details>
+    <footer class="site-footer no-print">
+      <a id="wa-contact" class="wa-link" href="https://wa.me/message/XKYNNMUO6ITZB1?src=qr" target="_blank" rel="noopener noreferrer">Chat on WhatsApp</a>
+    </footer>
+  </div>
+  <div id="menu-panel" class="sheet no-print" hidden>
+    <div class="sheet-backdrop" data-close="menu"></div>
+    <div class="sheet-card" role="dialog" aria-labelledby="menu-title">
+      <div class="sheet-head"><h2 id="menu-title">Menu</h2><button type="button" class="icon-btn" data-close="menu" aria-label="Close menu">×</button></div>
+      <label class="toggle"><input type="checkbox" id="sound-toggle"/> <span>Sound on Draw along</span></label>
+      <button type="button" id="about-btn" class="btn">About</button>
+    </div>
+  </div>
+  <div id="about-panel" class="sheet no-print" hidden>
+    <div class="sheet-backdrop" data-close="about"></div>
+    <div class="sheet-card" role="dialog" aria-labelledby="about-title">
+      <div class="sheet-head"><h2 id="about-title">About</h2><button type="button" class="icon-btn" data-close="about" aria-label="Close">×</button></div>
+      <p>A sikku kolam is a continuous rice-flour line that loops around a grid of dots.</p>
+    </div>
+  </div>
+  <div id="share-sheet" class="sheet no-print" hidden>
+    <div class="sheet-backdrop" data-close="share"></div>
+    <div class="sheet-card" role="dialog" aria-labelledby="share-title">
+      <div class="sheet-head"><h2 id="share-title">Share</h2><button type="button" class="icon-btn" data-close="share" aria-label="Close share">×</button></div>
+      <div class="share-row">
         <a id="share-wa" class="share-link" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         <a id="share-fb" class="share-link" target="_blank" rel="noopener noreferrer">Facebook</a>
         <a id="share-x" class="share-link" target="_blank" rel="noopener noreferrer">X</a>
-        <button type="button" id="copy-link" class="share-link as-button">Copy invite</button>
+        <button type="button" id="copy-link" class="share-link as-button">Copy link</button>
+        <button type="button" id="print-mono" class="share-link as-button">Print (white on black)</button>
+        <button type="button" id="print-color" class="share-link as-button">Print (color)</button>
       </div>
     </div>
-
-    <footer class="site-footer no-print">
-      <a id="wa-contact" class="wa-link" href="https://wa.me/message/XKYNNMUO6ITZB1?src=qr" target="_blank" rel="noopener noreferrer">
-        Chat with Kolam on WhatsApp
-      </a>
-    </footer>
   </div>
   <div id="toast" class="toast no-print" role="status"></div>
   ${jsSrc ? `<script type="module" crossorigin src="${jsSrc}"></script>` : ""}

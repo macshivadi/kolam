@@ -44,10 +44,13 @@ function patchHomepage(indexHtml: string, today: string, start: string, end: str
     /<div id="stage"[^>]*>\s*<\/div>/,
     `<div id="stage" class="stage" role="img" aria-label="Today's kolam">\n        ${svg}\n      </div>`,
   );
-  html = html.replace(
-    /<a id="permalink"[^>]*>[^<]*<\/a>/,
-    `<a id="permalink" class="permalink" href="${todayHref}">Permanent page</a>`,
-  );
+  const heroRe = /(<p id="hero-line"[^>]*>)([^<]*)(<\/p>)/;
+  if (heroRe.test(html)) {
+    const [y, mo, d] = today.split("-").map(Number);
+    const pretty = new Date(y, mo - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+    html = html.replace(heroRe, `$1${pretty}$3`);
+  }
+  void todayHref;
   if (!html.includes("application/ld+json")) {
     const ld = {
       "@context": "https://schema.org",

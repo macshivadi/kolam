@@ -77,7 +77,7 @@ describe("sikku path drawing", () => {
       // Strict D4 on even-width squares cannot reach a single loop
       // (the empty interior already has n+1 loops). Keep the count modest.
       expect(pattern.loopCount).toBeGreaterThanOrEqual(1);
-      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 4);
+      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 8);
     }
   });
 
@@ -112,7 +112,7 @@ describe("sikku path drawing", () => {
     for (const seed of [1, 7, 42, 99, 20261117]) {
       const pattern = generateKolam(GRIDS["7x7"], seed);
       expect(isD4Symmetric(pattern.grid)).toBe(true);
-      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 4);
+      expect(pattern.loopCount).toBeLessThanOrEqual(pattern.grid.W * 8);
     }
   });
 });

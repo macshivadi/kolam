@@ -58,8 +58,10 @@ export type GenerateOptions = {
 };
 
 /**
- * Build a valid sikku kolam for a grid and seed, retrying until a
- * single continuous loop covers every dot, or the fewest loops found.
+ * Build a valid sikku kolam for a grid and seed. The seed determines the
+ * pattern (so Generate taps stay distinct). Retries only run if a pulli
+ * would be left uncovered — we do not pick the fewest-loop candidate,
+ * which collapsed many seeds to the same all-off lattice.
  */
 export function generateKolam(
   spec: GridSpec,
@@ -68,18 +70,11 @@ export function generateKolam(
 ): KolamPattern {
   const attempts = opts.attempts ?? 8;
   let best: KolamPattern | null = null;
-  let bestScore = Infinity;
-
   for (let sub = 0; sub < attempts; sub++) {
     const s = attemptSeed(seed, sub);
-    const grid = constructSymmetricKolam(spec, s);
-    const pattern = fromGrid(grid, seed, sub);
-    const score = pattern.uncovered.length * 1000 + (pattern.loopCount - 1);
-    if (score < bestScore) {
-      best = pattern;
-      bestScore = score;
-      if (score === 0) break;
-    }
+    const pattern = fromGrid(constructSymmetricKolam(spec, s), seed, sub);
+    if (!best || pattern.uncovered.length < best.uncovered.length) best = pattern;
+    if (best.uncovered.length === 0) return best;
   }
   return best!;
 }

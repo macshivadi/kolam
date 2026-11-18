@@ -1,6 +1,7 @@
 import { kolamSvg } from "./render";
 import type { KolamPattern } from "./generator";
 import type { Theme } from "./themes";
+import type { FillRegion } from "./regions";
 
 /**
  * Render the kolam SVG onto a canvas at 2× the displayed size
@@ -10,8 +11,9 @@ export async function renderKolamPng(
   pattern: KolamPattern,
   theme: Theme,
   displayedWidth: number,
+  opts: { fills?: FillRegion[] } = {},
 ): Promise<Blob> {
-  const svg = kolamSvg(pattern, { theme, static: true });
+  const svg = kolamSvg(pattern, { theme, static: true, fills: opts.fills });
   const size = Math.max(1024, Math.round(Math.max(displayedWidth, 320) * 2));
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);

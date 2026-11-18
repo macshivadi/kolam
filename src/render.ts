@@ -1,11 +1,20 @@
 import type { KolamPattern } from "./generator";
 import type { Theme } from "./themes";
+import type { FillRegion } from "./regions";
+import type { KolamStyleId } from "./styles";
+import { motifSvg } from "./motifs";
 
 export type SvgOptions = {
   theme: Theme;
   /** When true, skip animation attributes (for PNG export and print). */
   static?: boolean;
   padding?: number;
+  /** Longer flour-from-the-fingers stroke, used by Draw along. */
+  slow?: boolean;
+  /** Rangoli face fills, drawn under the white outline. */
+  fills?: FillRegion[];
+  /** Festival / decorative motifs drawn with the kolam. */
+  style?: KolamStyleId;
 };
 
 function bounds(pattern: KolamPattern, padding: number) {
@@ -24,20 +33,60 @@ export function viewBoxFor(pattern: KolamPattern, padding = 1.15): string {
   return `${b.minX} ${b.minY} ${b.width} ${b.height}`;
 }
 
+export function strokeEndTime(pattern: KolamPattern, opts: SvgOptions): number {
+  if (opts.static) return 0;
+  const rowDelay = opts.slow ? 0.11 : 0.07;
+  return 0.45 + pattern.grid.max * rowDelay + drawDuration(opts);
+}
+
+export function drawDuration(opts: SvgOptions): number {
+  if (opts.static) return 0;
+  return opts.slow ? 9.5 : 5.6;
+}
+
+function filterDefs(id: string, width: number, height: number, pad: number): string {
+  // Grain is kept very light so strokes stay visually closed.
+  return `  <defs>
+    <filter id="floor-${id}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.09  0 0 0 0 0.06  0 0 0 0.16 0" result="grain"/>
+      <feBlend in="SourceGraphic" in2="grain" mode="overlay"/>
+    </filter>
+    <filter id="flour-${id}" x="-${pad + 1}" y="-${pad + 1}" width="${width}" height="${height}" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.03" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>`;
+}
+
+
+function fillGroup(fills: FillRegion[] | undefined): string {
+  if (!fills || fills.length === 0) return "";
+  return fills
+    .map(
+      (f) =>
+        `    <path class="rangoli-fill" d="${f.d}" fill="${f.fill}" fill-rule="evenodd" stroke="none"/>`,
+    )
+    .join("\n");
+}
+
 export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
-  const padding = opts.padding ?? 1.15;
+  const motifs = opts.style ? motifSvg(opts.style, pattern.grid.W) : "";
+  const padding = opts.padding ?? (motifs ? 1.35 : 1.15);
   const theme = opts.theme;
   const vb = viewBoxFor(pattern, padding);
+  const b = bounds(pattern, padding);
+  const fid = opts.static ? "s" : opts.slow ? "q" : "k";
   const animClass = opts.static ? "" : ' class="kolam-path"';
-  // Pulli appear first, row by row; the sikku stroke starts after the last row.
-  const rowDelay = 0.07;
+  const rowDelay = opts.slow ? 0.11 : 0.07;
+  const drawSecs = drawDuration(opts);
   const strokeDelay = 0.45 + pattern.grid.max * rowDelay;
   const paths = pattern.paths
     .map((d) => {
       const delay = opts.static
         ? ""
-        : ` style="animation-delay:${strokeDelay.toFixed(2)}s"`;
-      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay}/>`;
+        : ` style="animation-delay:${strokeDelay.toFixed(2)}s;animation-duration:${drawSecs.toFixed(2)}s"`;
+      return `    <path${animClass} d="${d}" fill="none" stroke="${theme.line}" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" pathLength="1"${delay} filter="url(#flour-${fid})"/>`;
     })
     .join("\n");
   const dots = pattern.grid.dots
@@ -49,7 +98,12 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
     })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">
-  <rect x="${-padding}" y="${-padding}" width="${pattern.grid.W + padding * 2}" height="${pattern.grid.W + padding * 2}" fill="${theme.floor}"/>
+${filterDefs(fid, b.width + 2, b.height + 2, padding)}
+  <rect x="${-padding}" y="${-padding}" width="${pattern.grid.W + padding * 2}" height="${pattern.grid.W + padding * 2}" fill="${theme.floor}" filter="url(#floor-${fid})"/>
+  <g class="kolam-fills${opts.fills?.length && !opts.static ? "" : opts.fills?.length ? " is-colored" : ""}"${opts.fills?.length ? ` filter="url(#flour-${fid})"` : ""}>
+${fillGroup(opts.fills)}
+  </g>
+  <g class="kolam-motifs" aria-hidden="true">${motifs}</g>
   <g class="kolam-lines">
 ${paths}
   </g>
@@ -60,16 +114,21 @@ ${dots}
 }
 
 /** 1200×630 Open Graph image as SVG, with the kolam centered on the floor. */
-export function ogShareSvg(pattern: KolamPattern, theme: Theme, caption?: string): string {
-  const padding = 1.15;
+export function ogShareSvg(
+  pattern: KolamPattern,
+  theme: Theme,
+  caption?: string,
+  style?: KolamStyleId,
+  fills?: FillRegion[],
+): string {
+  const padding = style ? 1.35 : 1.15;
   const vb = viewBoxFor(pattern, padding);
-  const inner = kolamSvg(pattern, { theme, static: true, padding });
-  // Extract inner content (no outer svg wrapper) by reusing the same drawing.
+  const inner = kolamSvg(pattern, { theme, static: true, padding, style, fills });
   const size = 560;
   const x = (1200 - size) / 2;
   const y = caption ? 36 : (630 - size) / 2;
   const title = caption
-    ? `<text x="600" y="612" text-anchor="middle" fill="${theme.ink}" font-family="Georgia, serif" font-size="28">${escapeXml(caption)}</text>`
+    ? `<text x="600" y="612" text-anchor="middle" fill="${theme.ink}" font-family="Georgia, 'Noto Serif', serif" font-size="28">${escapeXml(caption)}</text>`
     : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Kolam">
   <rect width="1200" height="630" fill="${theme.floor}"/>

@@ -200,7 +200,7 @@ export function traceLoops(grid: MirrorGrid): TraceResult {
         used.add(stateId(mids[i], -prev[0], -prev[1]));
       }
 
-      loops.push({ mids, dirs, vertices });
+      loops.push(startLoopAtBottom({ mids, dirs, vertices }));
     }
   }
 
@@ -218,6 +218,25 @@ export function traceLoops(grid: MirrorGrid): TraceResult {
   }
   const uncovered = grid.dots.filter((d) => !coveredKeys.has(pointKey(d.x, d.y)));
   return { loops, covered, uncovered };
+}
+
+
+/** Rotate a loop so tracing/animation begins at the bottom-most mid. */
+export function startLoopAtBottom(loop: Loop): Loop {
+  const n = loop.mids.length;
+  if (n === 0) return loop;
+  let best = 0;
+  for (let i = 1; i < n; i++) {
+    const a = loop.mids[i];
+    const b = loop.mids[best];
+    if (a.y > b.y + 1e-9 || (Math.abs(a.y - b.y) < 1e-9 && a.x < b.x)) best = i;
+  }
+  if (best === 0) return loop;
+  return {
+    mids: loop.mids.slice(best).concat(loop.mids.slice(0, best)),
+    dirs: loop.dirs.slice(best).concat(loop.dirs.slice(0, best)),
+    vertices: loop.vertices.slice(best).concat(loop.vertices.slice(0, best)),
+  };
 }
 
 export function allCurvesClosed(loops: Loop[]): boolean {

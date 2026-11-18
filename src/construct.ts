@@ -53,19 +53,27 @@ function toggleOrbit(grid: MirrorGrid, orbit: EdgeRef[]): MirrorGrid {
 
 export type OrbitKind = "center" | "corner" | "edge" | "interior";
 
+export function orbitRadiusNorm(grid: MirrorGrid, orbit: EdgeRef[]): number {
+  const c = grid.c;
+  let rSum = 0;
+  for (const e of orbit) {
+    const m = edgeMid(e);
+    rSum += Math.hypot(m.x - c, m.y - c);
+  }
+  return rSum / orbit.length / (c + 0.01);
+}
+
 /** Classify a D4 orbit by where its midpoints sit relative to the grid center. */
 export function classifyOrbit(grid: MirrorGrid, orbit: EdgeRef[]): OrbitKind {
   const c = grid.c;
-  let rSum = 0;
   let diag = 0;
   for (const e of orbit) {
     const m = edgeMid(e);
     const dx = m.x - c;
     const dy = m.y - c;
-    rSum += Math.hypot(dx, dy);
     if (Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.8) diag += 1;
   }
-  const rNorm = rSum / orbit.length / (c + 0.01);
+  const rNorm = orbitRadiusNorm(grid, orbit);
   if (rNorm < 0.24) return "center";
   if (rNorm > 0.74 && diag >= orbit.length / 2) return "corner";
   if (rNorm > 0.62) return "edge";
@@ -105,28 +113,29 @@ export function symmetryScore(grid: MirrorGrid): {
 }
 
 /**
- * Toggle whole D4 orbits only. Tight budget so a 10-year uniqueness walk stays fast.
+ * Repair uncovered pulli by toggling whole D4 orbits. Does not minimize
+ * loop count — that collapsed many seeds onto the same all-off lattice.
  */
 export function polishD4(grid: MirrorGrid, seed: number, maxTries = 8): MirrorGrid {
   let current = grid;
   let best = symmetryScore(current);
-  if (best.score <= 4) return current;
+  if (best.uncovered === 0) return current;
 
   const orbits = shuffle(listOrbits(current), seed >>> 0);
   let tries = 0;
   let improved = true;
-  while (improved && tries < maxTries && best.score > 4) {
+  while (improved && tries < maxTries && best.uncovered > 0) {
     improved = false;
     for (const orbit of orbits) {
       if (tries >= maxTries) break;
       const next = toggleOrbit(current, orbit);
       const s = symmetryScore(next);
       tries += 1;
-      if (s.score < best.score) {
+      if (s.uncovered < best.uncovered) {
         current = next;
         best = s;
         improved = true;
-        if (s.score <= 4) return current;
+        if (s.uncovered === 0) return current;
         break;
       }
     }
@@ -134,26 +143,55 @@ export function polishD4(grid: MirrorGrid, seed: number, maxTries = 8): MirrorGr
   return current;
 }
 
+/** Unique nonzero n-bit pattern for a seed (consecutive seeds differ). */
+export function bitsFromSeed(seed: number, n: number): boolean[] {
+  const bits = new Array<boolean>(n).fill(false);
+  if (n <= 0) return bits;
+  if (n <= 30) {
+    const mod = (1 << n) - 1;
+    let v = ((seed >>> 0) % mod) + 1;
+    for (let i = 0; i < n; i++) bits[i] = ((v >>> i) & 1) === 1;
+    return bits;
+  }
+  const head = bitsFromSeed(seed, 30);
+  for (let i = 0; i < 30; i++) bits[i] = head[i];
+  const tail = bitsFromSeed(Math.imul(seed, 0x9e3779b9) ^ 0x85ebca6b, n - 30);
+  for (let i = 0; i < n - 30; i++) bits[30 + i] = tail[i];
+  if (!bits.some(Boolean)) bits[0] = true;
+  return bits;
+}
+
 /**
- * Place a sparse, D4-symmetric set of interior mirrors: mostly open crossings
- * in the interior, petals and horns on the frame, sometimes a small circle
- * around the center pulli. Every change is a whole orbit, so the drawn
- * kolam stays 4-fold symmetric (including diamonds).
+ * Place a curated, D4-symmetric set of interior mirrors. A pretty default
+ * (border petals, optional center, open interior crossings) is XOR-ed with
+ * a unique bit mask from the seed, so each Generate tap and each day is a
+ * different valid closed kolam — never the empty all-off lattice.
  */
 export function constructSymmetricKolam(spec: GridSpec, seed: number): MirrorGrid {
   const grid = cloneMirrors(buildRegion(spec));
   const orbits = listOrbits(grid);
-  const rng = mulberry32(seed >>> 0);
-  const wantCenter = rng() < 0.34;
+  const tagged = orbits.map((orbit) => ({
+    orbit,
+    kind: classifyOrbit(grid, orbit),
+  }));
 
-  for (const orbit of orbits) {
-    const kind = classifyOrbit(grid, orbit);
-    let p: number;
-    if (kind === "center") p = wantCenter ? 0.92 : 0.06;
-    else if (kind === "corner") p = 0.48;
-    else if (kind === "edge") p = 0.4;
-    else p = 0.1;
-    applyOrbit(grid, orbit, rng() < p);
+  for (const t of tagged) applyOrbit(grid, t.orbit, false);
+
+  const bits = bitsFromSeed(seed >>> 0, tagged.length);
+  for (let i = 0; i < tagged.length; i++) {
+    const pretty = tagged[i].kind !== "interior";
+    applyOrbit(grid, tagged[i].orbit, pretty !== bits[i]);
+  }
+
+  let anyOn = false;
+  for (const t of tagged) {
+    if (getEdge(grid, t.orbit[0])) {
+      anyOn = true;
+      break;
+    }
+  }
+  if (!anyOn && tagged.length > 0) {
+    applyOrbit(grid, tagged[(seed >>> 0) % tagged.length].orbit, true);
   }
 
   return polishD4(grid, seed);
