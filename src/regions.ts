@@ -13,7 +13,7 @@ export type FillRegion = {
 };
 
 /** Must stay in step with the outline width in render.ts. */
-export const FILL_STROKE = 0.2;
+export const FILL_STROKE = 0.09;
 const SCALE = 40;
 
 function stampDisc(pix: Uint8Array, w: number, h: number, px: number, py: number, r: number): void {
@@ -284,7 +284,7 @@ export function colorRegions(pattern: KolamPattern, palette: readonly string[]):
   if (pattern.paths.length === 0 || palette.length === 0) return [];
   const sp = dotSpacing(pattern.spec);
   const padding = 1.15 * sp;
-  const strokeW = 0.2 * sp;
+  const strokeW = 0.09 * sp;
   const { pix, w, h, scale } = rasterizeStrokes(pattern.paths, padding, pattern.grid.W, SCALE, strokeW);
   const labels = new Uint32Array(pix.length);
   const raw = extractRegions(pix, labels, w, h, scale, padding);

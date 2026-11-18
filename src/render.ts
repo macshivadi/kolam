@@ -6,8 +6,8 @@ import type { KolamStyleId } from "./styles";
 import { motifSvg } from "./motifs";
 
 /** Fallback used by tests; prefer strokeWidthFor(spec). */
-export const STROKE_RATIO = 0.2;
-export const STROKE_WIDTH = 0.2;
+export const STROKE_RATIO = 0.09;
+export const STROKE_WIDTH = 0.09;
 
 export function strokeWidthFor(spec: Parameters<typeof dotSpacing>[0]): number {
   return STROKE_RATIO * dotSpacing(spec);
@@ -114,10 +114,11 @@ export function kolamSvg(pattern: KolamPattern, opts: SvgOptions): string {
           : ""
         : ` class="kolam-dot" style="animation-delay:${((p.y - 1) * rowDelay).toFixed(2)}s"`;
       const sp = dotSpacing(pattern.spec);
+      const dotR = 0.06 * sp;
       if (opts.goldRings) {
-        return `    <g${delay}><circle class="kolam-dot-ring" cx="${p.x}" cy="${p.y}" r="${(0.13 * sp).toFixed(3)}" fill="none" stroke="#e8c547" stroke-width="${(0.045 * sp).toFixed(3)}"/><circle cx="${p.x}" cy="${p.y}" r="${(0.07 * sp).toFixed(3)}" fill="${theme.dot}"/></g>`;
+        return `    <g${delay}><circle class="kolam-dot-ring" cx="${p.x}" cy="${p.y}" r="${(0.09 * sp).toFixed(3)}" fill="none" stroke="#e8c547" stroke-width="${(0.025 * sp).toFixed(3)}"/><circle cx="${p.x}" cy="${p.y}" r="${dotR.toFixed(3)}" fill="${theme.dot}"/></g>`;
       }
-      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="${(0.11 * sp).toFixed(3)}" fill="${theme.dot}"/>`;
+      return `    <circle${delay} cx="${p.x}" cy="${p.y}" r="${dotR.toFixed(3)}" fill="${theme.dot}"/>`;
     })
     .join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" role="img" aria-label="Kolam pattern" class="kolam-svg">
