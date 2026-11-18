@@ -21,9 +21,8 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     env:
-      # Switch this to https://kolam.com when the custom domain is attached.
-      SITE_URL: https://macshivadi.github.io/kolam
-      VITE_SITE_URL: https://macshivadi.github.io/kolam
+      SITE_URL: https://kolam.com
+      VITE_SITE_URL: https://kolam.com
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

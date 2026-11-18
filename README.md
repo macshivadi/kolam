@@ -2,7 +2,7 @@
 
 A personal one-page generator for traditional Tamil sikku / pulli kolam — rice-flour loop patterns drawn around a grid of dots. Every day gets a new, unique design. Open it, watch it draw, practice it, save a PNG, or print it in black on white.
 
-Live: [https://macshivadi.github.io/kolam/](https://macshivadi.github.io/kolam/)
+Live: [https://kolam.com](https://kolam.com) (also at [https://macshivadi.github.io/kolam/](https://macshivadi.github.io/kolam/))
 
 ## Use it
 
@@ -41,7 +41,7 @@ GitHub Actions deploys on every push to `main`, and also on a daily cron (`15 6 
 
 ### Switching the site URL later
 
-The workflow sets `SITE_URL` and `VITE_SITE_URL` to `https://macshivadi.github.io/kolam`. When the custom domain is attached, change both to `https://kolam.com` (no trailing slash), then rebuild. Vite’s `base` is already `'./'`, so asset paths work both at `/kolam/` and at the apex domain. Do not add a `CNAME` file until the DNS is ready.
+The workflow sets `SITE_URL` and `VITE_SITE_URL` to `https://kolam.com` (no trailing slash). `public/CNAME` contains `kolam.com`. Vite’s `base` is `'./'`, so asset paths work at the apex domain and at `/kolam/`.
 
 ## License
 
